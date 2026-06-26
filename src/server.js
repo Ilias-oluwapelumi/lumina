@@ -11,8 +11,16 @@ const PORT = process.env.PORT || 5000;
 
 // ─── SECURITY ────────────────────────────────────────────────────────────────
 app.use(helmet());
+const frontendUrl = process.env.FRONTEND_URL;
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: process.env.NODE_ENV === 'development'
+    ? true
+    : (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (frontendUrl && origin === frontendUrl) return callback(null, true);
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
