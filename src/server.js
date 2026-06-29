@@ -11,40 +11,32 @@ const PORT = process.env.PORT || 5000;
 
 // ─── SECURITY ────────────────────────────────────────────────────────────────
 app.use(helmet());
-const frontendUrl = process.env.FRONTEND_URL;
+
 const allowedOrigins = [
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  'http://localhost:8080',
-  'http://127.0.0.1:8080',
-  'http://localhost:8008',
-  'http://127.0.0.1:8008',
-  'http://localhost:4200',
-  'http://127.0.0.1:4200',
-  'http://localhost:5000',
-  'http://127.0.0.1:5000',
-  'https://lumina-tmwz.onrender.com', // ← add your Render URL
+  'https://lumina-tmwz.onrender.com',
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin — Flutter mobile, Postman, server-to-server
     if (!origin) return callback(null, true);
-    // Allow all in development
-    if (process.env.NODE_ENV === 'development') return callback(null, true);
-    // Allow Flutter web or browser clients on the whitelist
+    // Allow any localhost or 127.0.0.1 (Flutter web dev — random ports)
+    if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+      return callback(null, true);
+    }
+    // Allow whitelisted production origins
     if (allowedOrigins.includes(origin)) return callback(null, true);
     callback(new Error(`Origin ${origin} not allowed by CORS`));
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true, // ← needed for JWT Bearer tokens
+  credentials: true,
 }));
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
+  windowMs: 15 * 60 * 1000,
   max: 200,
   message: { success: false, message: 'Too many requests, please slow down.' },
 });
