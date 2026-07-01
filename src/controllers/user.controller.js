@@ -2,17 +2,21 @@ const db = require('../../config/db');
 const bcrypt = require('bcryptjs');
 
 // GET /api/users/profile
-exports.getProfile = (req, res) => {
-  const wallet = db.getWallet(req.user.id);
-  const { passwordHash, ...safeUser } = req.user;
-  res.json({ success: true, data: { user: { ...safeUser, wallet } } });
+exports.getProfile = async (req, res) => {
+  try {
+    const wallet = await db.getWallet(req.user.id);
+    const { passwordHash, ...safeUser } = req.user;
+    res.json({ success: true, data: { user: { ...safeUser, wallet } } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 // PATCH /api/users/profile
-exports.updateProfile = (req, res) => {
+exports.updateProfile = async (req, res) => {
   try {
     const { fullName, email, avatarUrl } = req.body;
-    const updated = db.updateUser(req.user.id, {
+    const updated = await db.updateUser(req.user.id, {
       ...(fullName && { fullName }),
       ...(email && { email }),
       ...(avatarUrl !== undefined && { avatarUrl }),
@@ -39,7 +43,7 @@ exports.changePassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Current password is incorrect' });
     }
     const hash = await bcrypt.hash(newPassword, 10);
-    db.updateUser(req.user.id, { passwordHash: hash });
+    await db.updateUser(req.user.id, { passwordHash: hash });
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -47,17 +51,21 @@ exports.changePassword = async (req, res) => {
 };
 
 // GET /api/users/dashboard-summary
-exports.getDashboardSummary = (req, res) => {
-  const wallet = db.getWallet(req.user.id);
-  const { transactions } = db.getUserTransactions(req.user.id, { limit: 5 });
-  const credits = transactions.filter(t => t.type === 'credit').reduce((s, t) => s + t.amount, 0);
-  const debits = transactions.filter(t => t.type === 'debit').reduce((s, t) => s + t.amount, 0);
-  res.json({
-    success: true,
-    data: {
-      wallet,
-      recentTransactions: transactions,
-      summary: { totalCredits: credits, totalDebits: debits },
-    },
-  });
+exports.getDashboardSummary = async (req, res) => {
+  try {
+    const wallet = await db.getWallet(req.user.id);
+    const { transactions } = await db.getUserTransactions(req.user.id, { limit: 5 });
+    const credits = transactions.filter(t => t.type === 'credit').reduce((s, t) => s + t.amount, 0);
+    const debits  = transactions.filter(t => t.type === 'debit').reduce((s, t) => s + t.amount, 0);
+    res.json({
+      success: true,
+      data: {
+        wallet,
+        recentTransactions: transactions,
+        summary: { totalCredits: credits, totalDebits: debits },
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };

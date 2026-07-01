@@ -28,34 +28,6 @@ const formatUser = (user, wallet) => ({
     bankName: wallet.bankName,
   } : null,
 });
-
-// POST /api/auth/register
-exports.register = async (req, res) => {
-  try {
-    const { fullName, email, phone, password } = req.body;
-    if (!fullName || !email || !phone || !password) {
-      return res.status(400).json({ success: false, message: 'All fields are required' });
-    }
-    if (password.length < 6) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
-    }
-    const user = await db.createUser({ fullName, email, phone, password });
-    const wallet = db.getWallet(user.id);
-    const { accessToken, refreshToken } = generateTokens(user.id);
-    res.status(201).json({
-      success: true,
-      message: 'Account created successfully',
-      data: {
-        user: formatUser(user, wallet),
-        accessToken,
-        refreshToken,
-      },
-    });
-  } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
-  }
-};
-
 // POST /api/auth/login
 exports.login = async (req, res) => {
   try {
@@ -63,7 +35,7 @@ exports.login = async (req, res) => {
     if (!phone || !password) {
       return res.status(400).json({ success: false, message: 'Phone and password required' });
     }
-    const user = db.findUserByPhone(phone);
+    const user = await db.findUserByPhone(phone); // ← await added
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
@@ -71,7 +43,7 @@ exports.login = async (req, res) => {
     if (!valid) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
-    const wallet = db.getWallet(user.id);
+    const wallet = await db.getWallet(user.id); // ← await added
     const { accessToken, refreshToken } = generateTokens(user.id);
     res.json({
       success: true,
@@ -87,18 +59,46 @@ exports.login = async (req, res) => {
   }
 };
 
+// POST /api/auth/register
+exports.register = async (req, res) => {
+  try {
+    const { fullName, email, phone, password } = req.body;
+    if (!fullName || !email || !phone || !password) {
+      return res.status(400).json({ success: false, message: 'All fields are required' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    }
+    const user = await db.createUser({ fullName, email, phone, password });
+    const wallet = await db.getWallet(user.id); // ← await added
+    const { accessToken, refreshToken } = generateTokens(user.id);
+    res.status(201).json({
+      success: true,
+      message: 'Account created successfully',
+      data: {
+        user: formatUser(user, wallet),
+        accessToken,
+        refreshToken,
+      },
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
 // POST /api/auth/refresh
-exports.refresh = (req, res) => {
+exports.refresh = async (req, res) => {
   const { refreshToken } = req.body;
   if (!refreshToken) {
     return res.status(401).json({ success: false, message: 'Refresh token required' });
   }
-  if (!db.hasRefreshToken(refreshToken)) {
+  const valid = await db.hasRefreshToken(refreshToken); // ← await added
+  if (!valid) {
     return res.status(401).json({ success: false, message: 'Invalid refresh token' });
   }
   try {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-    db.deleteRefreshToken(refreshToken);
+    await db.deleteRefreshToken(refreshToken); // ← await added
     const { accessToken, refreshToken: newRefresh } = generateTokens(decoded.id);
     res.json({ success: true, data: { accessToken, refreshToken: newRefresh } });
   } catch {
@@ -107,14 +107,14 @@ exports.refresh = (req, res) => {
 };
 
 // POST /api/auth/logout
-exports.logout = (req, res) => {
+exports.logout = async (req, res) => {
   const { refreshToken } = req.body;
-  if (refreshToken) db.deleteRefreshToken(refreshToken);
+  if (refreshToken) await db.deleteRefreshToken(refreshToken); // ← await added
   res.json({ success: true, message: 'Logged out successfully' });
 };
 
 // GET /api/auth/me
-exports.me = (req, res) => {
-  const wallet = db.getWallet(req.user.id);
+exports.me = async (req, res) => {
+  const wallet = await db.getWallet(req.user.id); // ← await added
   res.json({ success: true, data: { user: formatUser(req.user, wallet) } });
 };

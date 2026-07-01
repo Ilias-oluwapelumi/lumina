@@ -1,7 +1,6 @@
 const db = require('../../config/db');
 
 // ─── DATA CATALOG ─────────────────────────────────────────────────────────────
-
 const DATA_PLANS = {
   MTN: [
     { id: 'mtn-1', name: '1GB', validity: '1 Day', price: 300 },
@@ -63,33 +62,22 @@ const CABLE_PLANS = {
 const DISCOS = ['IKEDC', 'EKEDC', 'AEDC', 'PHED', 'IBEDC', 'KEDCO', 'JEDC', 'BEDC'];
 
 // ─── AIRTIME ──────────────────────────────────────────────────────────────────
-
-// GET /api/services/networks
 exports.getNetworks = (_req, res) => {
-  res.json({
-    success: true,
-    data: { networks: ['MTN', 'Airtel', 'Glo', '9Mobile'] },
-  });
+  res.json({ success: true, data: { networks: ['MTN', 'Airtel', 'Glo', '9Mobile'] } });
 };
 
-// POST /api/services/airtime
-exports.buyAirtime = (req, res) => {
+exports.buyAirtime = async (req, res) => {
   try {
     const { network, phone, amount } = req.body;
     if (!network || !phone || !amount || amount < 50) {
       return res.status(400).json({ success: false, message: 'Network, phone and amount (min ₦50) required' });
     }
-    const wallet = db.debitWallet(req.user.id, parseFloat(amount));
+    const wallet = await db.debitWallet(req.user.id, parseFloat(amount));
     const ref = `AIR${Date.now()}`;
-    const txn = db.createTransaction({
-      userId: req.user.id,
-      type: 'debit',
-      category: 'airtime',
-      title: `Airtime – ${network}`,
-      amount: parseFloat(amount),
-      status: 'successful',
-      icon: 'phone_android',
-      reference: ref,
+    const txn = await db.createTransaction({
+      userId: req.user.id, type: 'debit', category: 'airtime',
+      title: `Airtime – ${network}`, amount: parseFloat(amount),
+      status: 'successful', icon: 'phone_android', reference: ref,
       meta: { network, phone },
     });
     res.json({
@@ -103,36 +91,26 @@ exports.buyAirtime = (req, res) => {
 };
 
 // ─── DATA ─────────────────────────────────────────────────────────────────────
-
-// GET /api/services/data/plans?network=MTN
 exports.getDataPlans = (req, res) => {
   const { network } = req.query;
   const plans = DATA_PLANS[network];
-  if (!plans) {
-    return res.status(400).json({ success: false, message: 'Invalid network' });
-  }
+  if (!plans) return res.status(400).json({ success: false, message: 'Invalid network' });
   res.json({ success: true, data: { network, plans } });
 };
 
-// POST /api/services/data
-exports.buyData = (req, res) => {
+exports.buyData = async (req, res) => {
   try {
     const { network, phone, planId } = req.body;
     const plans = DATA_PLANS[network] || [];
     const plan = plans.find(p => p.id === planId);
     if (!plan) return res.status(400).json({ success: false, message: 'Invalid data plan' });
 
-    const wallet = db.debitWallet(req.user.id, plan.price);
+    const wallet = await db.debitWallet(req.user.id, plan.price);
     const ref = `DATA${Date.now()}`;
-    const txn = db.createTransaction({
-      userId: req.user.id,
-      type: 'debit',
-      category: 'data',
-      title: `Data – ${network} ${plan.name}`,
-      amount: plan.price,
-      status: 'successful',
-      icon: 'wifi',
-      reference: ref,
+    const txn = await db.createTransaction({
+      userId: req.user.id, type: 'debit', category: 'data',
+      title: `Data – ${network} ${plan.name}`, amount: plan.price,
+      status: 'successful', icon: 'wifi', reference: ref,
       meta: { network, phone, plan },
     });
     res.json({
@@ -146,52 +124,40 @@ exports.buyData = (req, res) => {
 };
 
 // ─── ELECTRICITY ──────────────────────────────────────────────────────────────
-
-// GET /api/services/electricity/discos
 exports.getDiscos = (_req, res) => {
   res.json({ success: true, data: { discos: DISCOS } });
 };
 
-// POST /api/services/electricity/verify
 exports.verifyMeter = (req, res) => {
   const { meterNumber, disco, meterType } = req.body;
   if (!meterNumber || !disco) {
     return res.status(400).json({ success: false, message: 'Meter number and DISCO required' });
   }
-  // In production: call VTU provider API to verify meter
   res.json({
     success: true,
     data: {
       meterNumber,
       customerName: 'OLUWASEUN ADEYEMI',
       address: '12, Akin Close, Lekki Phase 1, Lagos',
-      disco,
-      meterType: meterType || 'Prepaid',
-      minimumAmount: 500,
+      disco, meterType: meterType || 'Prepaid', minimumAmount: 500,
     },
   });
 };
 
-// POST /api/services/electricity/pay
-exports.payElectricity = (req, res) => {
+exports.payElectricity = async (req, res) => {
   try {
     const { meterNumber, disco, meterType, amount } = req.body;
     if (!meterNumber || !disco || !amount || amount < 500) {
       return res.status(400).json({ success: false, message: 'All fields required. Minimum ₦500' });
     }
-    const wallet = db.debitWallet(req.user.id, parseFloat(amount));
+    const wallet = await db.debitWallet(req.user.id, parseFloat(amount));
     const token = Array.from({ length: 4 }, () =>
       Math.floor(1000 + Math.random() * 9000)).join('-');
     const ref = `ELEC${Date.now()}`;
-    const txn = db.createTransaction({
-      userId: req.user.id,
-      type: 'debit',
-      category: 'electricity',
-      title: `${disco} – ${meterType}`,
-      amount: parseFloat(amount),
-      status: 'successful',
-      icon: 'bolt',
-      reference: ref,
+    const txn = await db.createTransaction({
+      userId: req.user.id, type: 'debit', category: 'electricity',
+      title: `${disco} – ${meterType}`, amount: parseFloat(amount),
+      status: 'successful', icon: 'bolt', reference: ref,
       meta: { meterNumber, disco, meterType, token },
     });
     res.json({
@@ -205,8 +171,6 @@ exports.payElectricity = (req, res) => {
 };
 
 // ─── CABLE TV ─────────────────────────────────────────────────────────────────
-
-// GET /api/services/cable/plans?provider=DSTV
 exports.getCablePlans = (req, res) => {
   const { provider } = req.query;
   const plans = CABLE_PLANS[provider];
@@ -214,13 +178,11 @@ exports.getCablePlans = (req, res) => {
   res.json({ success: true, data: { provider, plans } });
 };
 
-// POST /api/services/cable/verify
 exports.verifyCableCard = (req, res) => {
   const { smartCardNumber, provider } = req.body;
   if (!smartCardNumber || !provider) {
     return res.status(400).json({ success: false, message: 'Smart card number and provider required' });
   }
-  // Production: call VTU provider to verify card
   res.json({
     success: true,
     data: {
@@ -233,25 +195,19 @@ exports.verifyCableCard = (req, res) => {
   });
 };
 
-// POST /api/services/cable/subscribe
-exports.subscribeCable = (req, res) => {
+exports.subscribeCable = async (req, res) => {
   try {
     const { smartCardNumber, provider, planId } = req.body;
     const plans = CABLE_PLANS[provider] || [];
     const plan = plans.find(p => p.id === planId);
     if (!plan) return res.status(400).json({ success: false, message: 'Invalid plan' });
 
-    const wallet = db.debitWallet(req.user.id, plan.price);
+    const wallet = await db.debitWallet(req.user.id, plan.price);
     const ref = `CABLE${Date.now()}`;
-    const txn = db.createTransaction({
-      userId: req.user.id,
-      type: 'debit',
-      category: 'cable',
-      title: `${provider} ${plan.name}`,
-      amount: plan.price,
-      status: 'successful',
-      icon: 'tv',
-      reference: ref,
+    const txn = await db.createTransaction({
+      userId: req.user.id, type: 'debit', category: 'cable',
+      title: `${provider} ${plan.name}`, amount: plan.price,
+      status: 'successful', icon: 'tv', reference: ref,
       meta: { smartCardNumber, provider, plan },
     });
     res.json({

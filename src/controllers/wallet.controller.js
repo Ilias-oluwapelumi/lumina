@@ -2,22 +2,25 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../../config/db');
 
 // GET /api/wallet
-exports.getWallet = (req, res) => {
-  const wallet = db.getWallet(req.user.id);
-  if (!wallet) return res.status(404).json({ success: false, message: 'Wallet not found' });
-  res.json({ success: true, data: { wallet } });
+exports.getWallet = async (req, res) => {
+  try {
+    const wallet = await db.getWallet(req.user.id);
+    if (!wallet) return res.status(404).json({ success: false, message: 'Wallet not found' });
+    res.json({ success: true, data: { wallet } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 // POST /api/wallet/fund
-exports.fundWallet = (req, res) => {
+exports.fundWallet = async (req, res) => {
   try {
     const { amount, method, reference } = req.body;
     if (!amount || amount < 100) {
       return res.status(400).json({ success: false, message: 'Minimum funding amount is ₦100' });
     }
-    // In production: verify payment with Paystack using reference before crediting
-    const wallet = db.creditWallet(req.user.id, parseFloat(amount));
-    const txn = db.createTransaction({
+    const wallet = await db.creditWallet(req.user.id, parseFloat(amount));
+    const txn = await db.createTransaction({
       userId: req.user.id,
       type: 'credit',
       category: 'fund',
@@ -38,7 +41,7 @@ exports.fundWallet = (req, res) => {
 };
 
 // POST /api/wallet/withdraw
-exports.withdraw = (req, res) => {
+exports.withdraw = async (req, res) => {
   try {
     const { amount, accountNumber, bankName } = req.body;
     if (!amount || amount < 100) {
@@ -47,8 +50,8 @@ exports.withdraw = (req, res) => {
     if (!accountNumber || !bankName) {
       return res.status(400).json({ success: false, message: 'Account number and bank name required' });
     }
-    const wallet = db.debitWallet(req.user.id, parseFloat(amount));
-    const txn = db.createTransaction({
+    const wallet = await db.debitWallet(req.user.id, parseFloat(amount));
+    const txn = await db.createTransaction({
       userId: req.user.id,
       type: 'debit',
       category: 'withdrawal',
@@ -70,7 +73,7 @@ exports.withdraw = (req, res) => {
 };
 
 // POST /api/wallet/transfer
-exports.transfer = (req, res) => {
+exports.transfer = async (req, res) => {
   try {
     const { amount, accountNumber, bankName, note } = req.body;
     if (!amount || amount < 10) {
@@ -79,9 +82,9 @@ exports.transfer = (req, res) => {
     if (!accountNumber || !bankName) {
       return res.status(400).json({ success: false, message: 'Account number and bank name required' });
     }
-    const wallet = db.debitWallet(req.user.id, parseFloat(amount));
+    const wallet = await db.debitWallet(req.user.id, parseFloat(amount));
     const ref = `TXF${Date.now()}`;
-    const txn = db.createTransaction({
+    const txn = await db.createTransaction({
       userId: req.user.id,
       type: 'debit',
       category: 'transfer',
@@ -92,8 +95,6 @@ exports.transfer = (req, res) => {
       reference: ref,
       meta: { accountNumber, bankName, note },
     });
-    // Internal transfer: if destination is a Lumina account, credit them too
-    const destUser = [...Array.from({ length: 0 })]; // placeholder for real lookup
     res.json({
       success: true,
       message: `₦${Number(amount).toLocaleString()} sent successfully`,
