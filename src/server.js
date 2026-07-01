@@ -10,7 +10,9 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ─── SECURITY ────────────────────────────────────────────────────────────────
+
 app.use(helmet());
+app.set('trust proxy', 1);
 
 const allowedOrigins = [
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
