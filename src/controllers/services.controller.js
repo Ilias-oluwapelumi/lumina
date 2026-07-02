@@ -1,5 +1,5 @@
-const db = require('../../config/db');
-const vtpass = require('../../services/vtpass');
+const db = require('../config/db');         // ← one ../
+const vtpass = require('../services/vtpass'); // ← one ../
 
 // POST /api/services/airtime
 exports.buyAirtime = async (req, res) => {
