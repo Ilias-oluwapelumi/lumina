@@ -46,11 +46,11 @@ const refreshTokenSchema = new mongoose.Schema({
   token: { type: String, required: true, unique: true },
 });
 
-const User         = mongoose.model('User', userSchema);
-const Wallet       = mongoose.model('Wallet', walletSchema);
-const Transaction  = mongoose.model('Transaction', transactionSchema);
-const RefreshToken = mongoose.model('RefreshToken', refreshTokenSchema);
-
+// ✅ With these (prevents re-registration)
+const User         = mongoose.models.User         || mongoose.model('User', userSchema);
+const Wallet       = mongoose.models.Wallet       || mongoose.model('Wallet', walletSchema);
+const Transaction  = mongoose.models.Transaction  || mongoose.model('Transaction', transactionSchema);
+const RefreshToken = mongoose.models.RefreshToken || mongoose.model('RefreshToken', refreshTokenSchema);
 // ─── SEED DEMO USER ──────────────────────────────────────────────────────────
 async function seed() {
   const exists = await User.findOne({ phone: '08012345678' });
