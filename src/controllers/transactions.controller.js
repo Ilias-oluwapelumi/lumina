@@ -1,4 +1,4 @@
-const db = require('../../config/db');
+const db = require('../config/db');
 
 // GET /api/transactions
 exports.getTransactions = async (req, res) => {

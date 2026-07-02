@@ -1,4 +1,4 @@
-const db = require('../../config/db');
+const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 
 // GET /api/users/profile
