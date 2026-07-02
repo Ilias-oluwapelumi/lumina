@@ -1,6 +1,23 @@
 const db = require('../config/db');         // ← one ../
 const vtpass = require('../services/vtpass'); // ← one ../
 
+// GET /api/services/networks
+exports.getNetworks = (_req, res) => {
+  res.json({
+    success: true,
+    data: { networks: ['MTN', 'Airtel', 'Glo', '9Mobile'] },
+  });
+};
+
+// GET /api/services/electricity/discos
+exports.getDiscos = (_req, res) => {
+  res.json({
+    success: true,
+    data: { discos: ['IKEDC', 'EKEDC', 'AEDC', 'PHED', 'IBEDC', 'KEDCO', 'JEDC', 'BEDC'] },
+  });
+};
+
+
 // POST /api/services/airtime
 exports.buyAirtime = async (req, res) => {
   try {
