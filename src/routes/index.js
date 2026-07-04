@@ -23,7 +23,7 @@ router.get('/users/dashboard', auth, userCtrl.getDashboardSummary);
 
 // ─── WALLET ───────────────────────────────────────────────────────────────────
 router.get('/wallet', auth, walletCtrl.getWallet);
-router.post('/wallet/fund', auth, walletCtrl.fundWallet);
+//router.post('/wallet/fund', auth, walletCtrl.fundWallet);
 router.post('/wallet/withdraw', auth, walletCtrl.withdraw);
 router.post('/wallet/transfer', auth, walletCtrl.transfer);
 router.post('/wallet/fund/initialize', auth, walletCtrl.initializeFunding);
