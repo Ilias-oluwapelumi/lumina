@@ -140,7 +140,7 @@ const db = {
   },
 
   getTransactionById: (id) => Transaction.findOne({ id }).lean(),
-
+getTransactionByReference: (reference) => Transaction.findOne({ reference }).lean(),
   storeRefreshToken:  (token) => RefreshToken.create({ token }),
   hasRefreshToken:    (token) => RefreshToken.exists({ token }),
   deleteRefreshToken: (token) => RefreshToken.deleteOne({ token }),

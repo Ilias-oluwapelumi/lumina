@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db');
+const paystack = require('../services/paystack');
 
 // GET /api/wallet
 exports.getWallet = async (req, res) => {
@@ -12,27 +13,63 @@ exports.getWallet = async (req, res) => {
   }
 };
 
-// POST /api/wallet/fund
-exports.fundWallet = async (req, res) => {
+// POST /api/wallet/fund/initialize
+exports.initializeFunding = async (req, res) => {
   try {
-    const { amount, method, reference } = req.body;
+    const { amount } = req.body;
     if (!amount || amount < 100) {
       return res.status(400).json({ success: false, message: 'Minimum funding amount is ₦100' });
     }
-    const wallet = await db.creditWallet(req.user.id, parseFloat(amount));
+    const reference = `FUND${Date.now()}`;
+    const result = await paystack.initializePayment({
+      email: req.user.email,
+      amount: parseFloat(amount),
+      reference,
+    });
+    res.json({
+      success: true,
+      message: 'Payment initialized',
+      data: {
+        authorizationUrl: result.authorizationUrl,
+        accessCode: result.accessCode,
+        reference: result.reference,
+        amount: parseFloat(amount),
+      },
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+// POST /api/wallet/fund/verify
+exports.verifyFunding = async (req, res) => {
+  try {
+    const { reference } = req.body;
+    if (!reference) {
+      return res.status(400).json({ success: false, message: 'Reference required' });
+    }
+    const payment = await paystack.verifyPayment(reference);
+    if (payment.status !== 'success') {
+      return res.status(400).json({ success: false, message: 'Payment not successful' });
+    }
+    const existing = await db.getTransactionByReference(reference);
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'Transaction already processed' });
+    }
+    const wallet = await db.creditWallet(req.user.id, payment.amount);
     const txn = await db.createTransaction({
       userId: req.user.id,
       type: 'credit',
       category: 'fund',
-      title: `Wallet Funding via ${method || 'Bank Transfer'}`,
-      amount: parseFloat(amount),
+      title: 'Wallet Funding via Paystack',
+      amount: payment.amount,
       status: 'successful',
       icon: 'account_balance',
-      reference: reference || `FUND${Date.now()}`,
+      reference,
     });
     res.json({
       success: true,
-      message: `₦${Number(amount).toLocaleString()} added to your wallet`,
+      message: `₦${Number(payment.amount).toLocaleString()} added to your wallet`,
       data: { wallet, transaction: txn },
     });
   } catch (err) {
