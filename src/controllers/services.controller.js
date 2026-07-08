@@ -130,6 +130,43 @@ exports.verifyCableCard = async (req, res) => {
   }
 };
 
+// POST /api/services/betting
+exports.fundBetting = async (req, res) => {
+  try {
+    const { platform, userId, amount } = req.body;
+    if (!platform || !userId || !amount || amount < 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Platform, user ID and amount (min ₦100) required'
+      });
+    }
+    // Debit wallet
+    const wallet = await db.debitWallet(req.user.id, parseFloat(amount));
+    const ref = `BET${Date.now()}`;
+    const txn = await db.createTransaction({
+      userId: req.user.id,
+      type: 'debit',
+      category: 'betting',
+      title: `${platform} Wallet Funding`,
+      amount: parseFloat(amount),
+      status: 'successful',
+      icon: 'sports_soccer',
+      reference: ref,
+      meta: { platform, userId },
+    });
+    res.json({
+      success: true,
+      message: `₦${Number(amount).toLocaleString()} sent to your ${platform} wallet`,
+      data: { wallet, transaction: txn, reference: ref },
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+
+
+
 // POST /api/services/cable/subscribe
 exports.subscribeCable = async (req, res) => {
   try {

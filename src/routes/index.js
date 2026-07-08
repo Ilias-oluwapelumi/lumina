@@ -48,4 +48,6 @@ router.get('/services/cable/plans', auth, servicesCtrl.getCablePlans);
 router.post('/services/cable/verify', auth, servicesCtrl.verifyCableCard);
 router.post('/services/cable/subscribe', auth, servicesCtrl.subscribeCable);
 
+router.post('/services/betting', auth, servicesCtrl.fundBetting);
+
 module.exports = router;
