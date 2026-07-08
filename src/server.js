@@ -54,6 +54,21 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+// Wallet rate limiter
+const walletLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { success: false, message: 'Too many wallet requests, please slow down.' },
+});
+app.use('/api/wallet', walletLimiter);
+
+// Services rate limiter
+const servicesLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50,
+  message: { success: false, message: 'Too many service requests, please slow down.' },
+});
+app.use('/api/services', servicesLimiter);
 
 // ─── MIDDLEWARE ───────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
