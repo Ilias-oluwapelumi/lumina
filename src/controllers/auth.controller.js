@@ -35,15 +35,52 @@ exports.login = async (req, res) => {
     if (!phone || !password) {
       return res.status(400).json({ success: false, message: 'Phone and password required' });
     }
-    const user = await db.findUserByPhone(phone); // ← await added
+
+    const user = await db.findUserByPhone(phone);
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
-    const valid = await db.verifyPassword(user, password);
-    if (!valid) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+
+    // Check if account is locked
+    if (user.lockedUntil && new Date() < new Date(user.lockedUntil)) {
+      const minutesLeft = Math.ceil(
+        (new Date(user.lockedUntil) - new Date()) / 1000 / 60
+      );
+      return res.status(423).json({
+        success: false,
+        message: `Account locked. Try again in ${minutesLeft} minute${minutesLeft > 1 ? 's' : ''}.`
+      });
     }
-    const wallet = await db.getWallet(user.id); // ← await added
+
+    const valid = await db.verifyPassword(user, password);
+
+    if (!valid) {
+      // Increment failed attempts
+      const attempts = (user.failedAttempts || 0) + 1;
+      const updateData = { failedAttempts: attempts };
+
+      // Lock account after 5 failed attempts for 30 minutes
+      if (attempts >= 5) {
+        updateData.lockedUntil = new Date(Date.now() + 30 * 60 * 1000);
+        updateData.failedAttempts = 0;
+        await db.updateUser(user.id, updateData);
+        return res.status(423).json({
+          success: false,
+          message: 'Account locked for 30 minutes due to too many failed attempts.'
+        });
+      }
+
+      await db.updateUser(user.id, updateData);
+      return res.status(401).json({
+        success: false,
+        message: `Invalid credentials. ${5 - attempts} attempt${5 - attempts > 1 ? 's' : ''} remaining.`
+      });
+    }
+
+    // Reset failed attempts on successful login
+    await db.updateUser(user.id, { failedAttempts: 0, lockedUntil: null });
+
+    const wallet = await db.getWallet(user.id);
     const { accessToken, refreshToken } = generateTokens(user.id);
     res.json({
       success: true,

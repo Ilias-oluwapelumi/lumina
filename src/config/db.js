@@ -19,6 +19,8 @@ const userSchema = new mongoose.Schema({
   kycVerified:  { type: Boolean, default: false },
   avatarUrl:    { type: String, default: null },
   createdAt:    { type: String, default: () => new Date().toISOString() },
+  failedAttempts: { type: Number, default: 0 },  // ← ADD THIS
+  lockedUntil:    { type: Date, default: null },
 });
 
 const walletSchema = new mongoose.Schema({
