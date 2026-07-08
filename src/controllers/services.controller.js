@@ -165,6 +165,45 @@ exports.fundBetting = async (req, res) => {
 };
 
 
+// POST /api/services/education
+exports.purchaseEducation = async (req, res) => {
+  try {
+    const { service, type, quantity, amount } = req.body;
+    if (!service || !type || !quantity || !amount) {
+      return res.status(400).json({
+        success: false,
+        message: 'All fields are required'
+      });
+    }
+    const wallet = await db.debitWallet(req.user.id, parseFloat(amount));
+    const ref = `EDU${Date.now()}`;
+
+    // Generate pins
+    const pins = Array.from({ length: quantity }, () => ({
+      pin: Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString(),
+      serial: Math.floor(100000000000 + Math.random() * 900000000000).toString(),
+    }));
+
+    const txn = await db.createTransaction({
+      userId: req.user.id,
+      type: 'debit',
+      category: 'education',
+      title: `${service} ${type} x${quantity}`,
+      amount: parseFloat(amount),
+      status: 'successful',
+      icon: 'school',
+      reference: ref,
+      meta: { service, type, quantity, pins },
+    });
+    res.json({
+      success: true,
+      message: `${quantity} ${service} ${type} pin${quantity > 1 ? 's' : ''} purchased successfully`,
+      data: { wallet, transaction: txn, reference: ref, pins },
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
 
 
 // POST /api/services/cable/subscribe

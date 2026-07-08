@@ -50,4 +50,6 @@ router.post('/services/cable/subscribe', auth, servicesCtrl.subscribeCable);
 
 router.post('/services/betting', auth, servicesCtrl.fundBetting);
 
+router.post('/services/education', auth, servicesCtrl.purchaseEducation);
+
 module.exports = router;
