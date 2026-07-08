@@ -8,10 +8,12 @@ const routes = require('./routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const mongoSanitize = require('express-mongo-sanitize')
 
 // ─── SECURITY ────────────────────────────────────────────────────────────────
 
 app.use(helmet());
+app.use(mongoSanitize()); // ← ADD THIS LINE
 app.set('trust proxy', 1);
 
 const allowedOrigins = [
