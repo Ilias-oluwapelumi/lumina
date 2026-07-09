@@ -69,3 +69,39 @@ exports.getDashboardSummary = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// POST /api/users/set-pin
+exports.setPin = async (req, res) => {
+  try {
+    const { pin } = req.body;
+    if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ success: false, message: 'PIN must be exactly 4 digits' });
+    }
+    const hash = await bcrypt.hash(pin, 10);
+    await db.updateUser(req.user.id, { transactionPin: hash });
+    res.json({ success: true, message: 'Transaction PIN set successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// POST /api/users/verify-pin
+exports.verifyPin = async (req, res) => {
+  try {
+    const { pin } = req.body;
+    if (!pin) {
+      return res.status(400).json({ success: false, message: 'PIN required' });
+    }
+    const user = await db.findUserById(req.user.id);
+    if (!user.transactionPin) {
+      return res.status(400).json({ success: false, message: 'Transaction PIN not set' });
+    }
+    const valid = await bcrypt.compare(pin, user.transactionPin);
+    if (!valid) {
+      return res.status(401).json({ success: false, message: 'Invalid PIN' });
+    }
+    res.json({ success: true, message: 'PIN verified' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

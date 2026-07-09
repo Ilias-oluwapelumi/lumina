@@ -21,6 +21,7 @@ const userSchema = new mongoose.Schema({
   createdAt:    { type: String, default: () => new Date().toISOString() },
   failedAttempts: { type: Number, default: 0 },  // ← ADD THIS
   lockedUntil:    { type: Date, default: null },
+  transactionPin: { type: String, default: null }, // ← ADD THIS
 });
 
 const walletSchema = new mongoose.Schema({

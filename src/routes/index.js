@@ -52,4 +52,8 @@ router.post('/services/betting', auth, servicesCtrl.fundBetting);
 
 router.post('/services/education', auth, servicesCtrl.purchaseEducation);
 
+
+router.post('/users/set-pin', auth, userCtrl.setPin);
+router.post('/users/verify-pin', auth, userCtrl.verifyPin);
+
 module.exports = router;
