@@ -71,6 +71,7 @@ exports.getDashboardSummary = async (req, res) => {
 };
 
 // POST /api/users/set-pin
+// POST /api/users/set-pin
 exports.setPin = async (req, res) => {
   try {
     const { pin } = req.body;
@@ -78,11 +79,16 @@ exports.setPin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'PIN must be exactly 4 digits' });
     }
     const hash = await bcrypt.hash(pin, 10);
-
-    // Direct MongoDB update to bypass updateUser
-    const result = await require('../config/db').directUpdatePin(req.user.id, hash);
-    console.log('Direct update result:', JSON.stringify(result));
-
+    
+    // Direct MongoDB update
+    const mongoose = require('mongoose');
+    const User = mongoose.model('User');
+    const result = await User.updateOne(
+      { id: req.user.id },
+      { $set: { transactionPin: hash } }
+    );
+    
+    console.log('PIN update result:', JSON.stringify(result));
     res.json({ success: true, message: 'Transaction PIN set successfully' });
   } catch (err) {
     console.error('setPin error:', err);
@@ -91,16 +97,23 @@ exports.setPin = async (req, res) => {
 };
 
 // POST /api/users/verify-pin
+// POST /api/users/verify-pin
 exports.verifyPin = async (req, res) => {
   try {
     const { pin } = req.body;
     if (!pin) {
       return res.status(400).json({ success: false, message: 'PIN required' });
     }
-    const user = await db.findUserById(req.user.id);
+
+    // Direct MongoDB query
+    const mongoose = require('mongoose');
+    const User = mongoose.model('User');
+    const user = await User.findOne({ id: req.user.id }).lean();
+
     console.log('verifyPin - user id:', req.user.id);
     console.log('verifyPin - transactionPin exists:', user?.transactionPin ? 'YES' : 'NO');
-    if (!user.transactionPin) {
+
+    if (!user || !user.transactionPin) {
       return res.status(400).json({ success: false, message: 'Transaction PIN not set' });
     }
     const valid = await bcrypt.compare(pin, user.transactionPin);
