@@ -151,5 +151,13 @@ getTransactionByReference: (reference) => Transaction.findOne({ reference }).lea
   hasRefreshToken:    (token) => RefreshToken.exists({ token }),
   deleteRefreshToken: (token) => RefreshToken.deleteOne({ token }),
 };
+directUpdatePin: async (id, pinHash) => {
+  const result = await User.updateOne(
+    { id },
+    { $set: { transactionPin: pinHash } }
+  );
+  console.log('MongoDB updateOne result:', JSON.stringify(result));
+  return result;
+},
 
 module.exports = db;

@@ -78,9 +78,11 @@ exports.setPin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'PIN must be exactly 4 digits' });
     }
     const hash = await bcrypt.hash(pin, 10);
-    const updated = await db.updateUser(req.user.id, { transactionPin: hash });
-    console.log('PIN set for user:', req.user.id);
-    console.log('transactionPin saved:', updated?.transactionPin ? 'YES' : 'NO');
+
+    // Direct MongoDB update to bypass updateUser
+    const result = await require('../config/db').directUpdatePin(req.user.id, hash);
+    console.log('Direct update result:', JSON.stringify(result));
+
     res.json({ success: true, message: 'Transaction PIN set successfully' });
   } catch (err) {
     console.error('setPin error:', err);
