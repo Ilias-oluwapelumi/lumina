@@ -100,11 +100,14 @@ const db = {
 
   verifyPassword: (user, plain) => bcrypt.compare(plain, user.passwordHash),
 
-  updateUser: async (id, fields) => {
-    const user = await User.findOneAndUpdate({ id }, fields, { new: true }).lean();
-    if (!user) throw new Error('User not found');
-    return user;
-  },
+  // ✅ Fixed
+updateUser: async (id, fields) => {
+  const user = await User.findOneAndUpdate(
+    { id }, fields, { returnDocument: 'after' }
+  ).lean();
+  if (!user) throw new Error('User not found');
+  return user;
+},
 
   getWallet: (userId) => Wallet.findOne({ userId }).lean(),
 
