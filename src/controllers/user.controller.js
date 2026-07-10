@@ -1,5 +1,9 @@
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const User = () => mongoose.model('User');
 
 // GET /api/users/profile
 exports.getProfile = async (req, res) => {
@@ -43,7 +47,9 @@ exports.changePassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Current password is incorrect' });
     }
     const hash = await bcrypt.hash(newPassword, 10);
-    await db.updateUser(req.user.id, { passwordHash: hash });
+    // Use _id for reliable update
+    const existingUser = await User().findOne({ id: req.user.id }).lean();
+    await User().updateOne({ _id: existingUser._id }, { $set: { passwordHash: hash } });
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -71,7 +77,6 @@ exports.getDashboardSummary = async (req, res) => {
 };
 
 // POST /api/users/set-pin
-// POST /api/users/set-pin
 exports.setPin = async (req, res) => {
   try {
     const { pin } = req.body;
@@ -79,23 +84,24 @@ exports.setPin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'PIN must be exactly 4 digits' });
     }
     const hash = await bcrypt.hash(pin, 10);
-    
-    const mongoose = require('mongoose');
-    const User = mongoose.model('User');
 
-    // First check if user exists
-    const existingUser = await User.findOne({ id: req.user.id }).lean();
-    console.log('User found:', existingUser ? 'YES' : 'NO');
-    console.log('User id searched:', req.user.id);
-    console.log('User _id:', existingUser?._id);
+    // Find user by custom id first, then update by _id
+    const existingUser = await User().findOne({ id: req.user.id }).lean();
+    if (!existingUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
-    const result = await User.updateOne(
-      { id: req.user.id },
-      { $set: { transactionPin: hash } },
-      { writeConcern: { w: 1 } }
+    const result = await User().updateOne(
+      { _id: existingUser._id },
+      { $set: { transactionPin: hash } }
     );
-    
+
     console.log('PIN update result:', JSON.stringify(result));
+
+    // Verify it saved
+    const check = await User().findOne({ _id: existingUser._id }).lean();
+    console.log('PIN saved check:', check?.transactionPin ? 'YES' : 'NO');
+
     res.json({ success: true, message: 'Transaction PIN set successfully' });
   } catch (err) {
     console.error('setPin error:', err);
@@ -104,7 +110,6 @@ exports.setPin = async (req, res) => {
 };
 
 // POST /api/users/verify-pin
-// POST /api/users/verify-pin
 exports.verifyPin = async (req, res) => {
   try {
     const { pin } = req.body;
@@ -112,21 +117,19 @@ exports.verifyPin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'PIN required' });
     }
 
-    // Direct MongoDB query
-    const mongoose = require('mongoose');
-    const User = mongoose.model('User');
-    const user = await User.findOne({ id: req.user.id }).lean();
-
-    console.log('verifyPin - user id:', req.user.id);
+    // Find user by custom id
+    const user = await User().findOne({ id: req.user.id }).lean();
     console.log('verifyPin - transactionPin exists:', user?.transactionPin ? 'YES' : 'NO');
 
     if (!user || !user.transactionPin) {
       return res.status(400).json({ success: false, message: 'Transaction PIN not set' });
     }
+
     const valid = await bcrypt.compare(pin, user.transactionPin);
     if (!valid) {
       return res.status(401).json({ success: false, message: 'Invalid PIN' });
     }
+
     res.json({ success: true, message: 'PIN verified' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
