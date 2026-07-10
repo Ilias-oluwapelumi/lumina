@@ -96,11 +96,11 @@ exports.setPin = async (req, res) => {
       { $set: { transactionPin: hash } }
     );
 
-    console.log('PIN update result:', JSON.stringify(result));
+  
 
     // Verify it saved
     const check = await User().findOne({ _id: existingUser._id }).lean();
-    console.log('PIN saved check:', check?.transactionPin ? 'YES' : 'NO');
+   
 
     res.json({ success: true, message: 'Transaction PIN set successfully' });
   } catch (err) {
@@ -119,7 +119,7 @@ exports.verifyPin = async (req, res) => {
 
     // Find user by custom id
     const user = await User().findOne({ id: req.user.id }).lean();
-    console.log('verifyPin - transactionPin exists:', user?.transactionPin ? 'YES' : 'NO');
+   
 
     if (!user || !user.transactionPin) {
       return res.status(400).json({ success: false, message: 'Transaction PIN not set' });
