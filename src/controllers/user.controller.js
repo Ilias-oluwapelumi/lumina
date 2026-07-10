@@ -80,12 +80,19 @@ exports.setPin = async (req, res) => {
     }
     const hash = await bcrypt.hash(pin, 10);
     
-    // Direct MongoDB update
     const mongoose = require('mongoose');
     const User = mongoose.model('User');
+
+    // First check if user exists
+    const existingUser = await User.findOne({ id: req.user.id }).lean();
+    console.log('User found:', existingUser ? 'YES' : 'NO');
+    console.log('User id searched:', req.user.id);
+    console.log('User _id:', existingUser?._id);
+
     const result = await User.updateOne(
       { id: req.user.id },
-      { $set: { transactionPin: hash } }
+      { $set: { transactionPin: hash } },
+      { writeConcern: { w: 1 } }
     );
     
     console.log('PIN update result:', JSON.stringify(result));
