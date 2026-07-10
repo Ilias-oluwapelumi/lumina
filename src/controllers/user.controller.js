@@ -84,17 +84,27 @@ exports.setPin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'PIN must be exactly 4 digits' });
     }
     const hash = await bcrypt.hash(pin, 10);
+    console.log('Hash generated:', hash.substring(0, 10));
 
-    // Find user by custom id first, then update by _id
-    const existingUser = await User().findOne({ id: req.user.id }).lean();
-    if (!existingUser) {
+    // Use findOneAndUpdate with upsert
+    const result = await User().findOneAndUpdate(
+      { id: req.user.id },
+      { $set: { transactionPin: hash } },
+      { new: true, upsert: false }
+    );
+
+    console.log('Updated transactionPin:', result?.transactionPin?.substring(0, 10));
+    
+    if (!result) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const result = await User().updateOne(
-      { _id: existingUser._id },
-      { $set: { transactionPin: hash } }
-    );
+    res.json({ success: true, message: 'Transaction PIN set successfully' });
+  } catch (err) {
+    console.error('setPin error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
   
 
