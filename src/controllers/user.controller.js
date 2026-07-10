@@ -84,6 +84,25 @@ exports.setPin = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+exports.setPin = async (req, res) => {
+  try {
+    const { pin } = req.body;
+    if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ success: false, message: 'PIN must be exactly 4 digits' });
+    }
+    const hash = await bcrypt.hash(pin, 10);
+    const updated = await db.updateUser(req.user.id, { transactionPin: hash });
+    
+    // ← ADD THIS TEMPORARY LOG
+    console.log('PIN set for user:', req.user.id);
+    console.log('transactionPin saved:', updated?.transactionPin ? 'YES' : 'NO');
+    
+    res.json({ success: true, message: 'Transaction PIN set successfully' });
+  } catch (err) {
+    console.error('setPin error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 // POST /api/users/verify-pin
 exports.verifyPin = async (req, res) => {
@@ -93,6 +112,27 @@ exports.verifyPin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'PIN required' });
     }
     const user = await db.findUserById(req.user.id);
+    if (!user.transactionPin) {
+      return res.status(400).json({ success: false, message: 'Transaction PIN not set' });
+    }
+    const valid = await bcrypt.compare(pin, user.transactionPin);
+    if (!valid) {
+      return res.status(401).json({ success: false, message: 'Invalid PIN' });
+    }
+    res.json({ success: true, message: 'PIN verified' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+exports.verifyPin = async (req, res) => {
+  try {
+    const { pin } = req.body;
+    const user = await db.findUserById(req.user.id);
+    
+    // ← ADD THIS TEMPORARY LOG
+    console.log('verifyPin - user id:', req.user.id);
+    console.log('verifyPin - transactionPin exists:', user?.transactionPin ? 'YES' : 'NO');
+    
     if (!user.transactionPin) {
       return res.status(400).json({ success: false, message: 'Transaction PIN not set' });
     }
