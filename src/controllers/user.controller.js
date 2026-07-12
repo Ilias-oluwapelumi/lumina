@@ -85,18 +85,16 @@ exports.setPin = async (req, res) => {
     }
     const hash = await bcrypt.hash(pin, 10);
 
-    // Use custom id field NOT MongoDB _id
-    const result = await User().findOneAndUpdate(
+    // Update using updateOne
+    const updateResult = await User().updateOne(
       { id: req.user.id },
-      { $set: { transactionPin: hash } },
-      { new: true }
+      { $set: { transactionPin: hash } }
     );
+    console.log('updateOne result:', JSON.stringify(updateResult));
 
-    console.log('setPin result transactionPin:', result?.transactionPin?.substring(0, 10));
-
-    if (!result) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
+    // Verify by fetching fresh
+    const check = await User().findOne({ id: req.user.id }).lean();
+    console.log('PIN in DB after update:', check?.transactionPin?.substring(0, 10));
 
     res.json({ success: true, message: 'Transaction PIN set successfully' });
   } catch (err) {
@@ -104,7 +102,6 @@ exports.setPin = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 // POST /api/users/verify-pin
 exports.verifyPin = async (req, res) => {
   try {
