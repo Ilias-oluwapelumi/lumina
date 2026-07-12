@@ -2,7 +2,6 @@ const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
 const User = () => mongoose.model('User');
 
 // GET /api/users/profile
@@ -47,8 +46,10 @@ exports.changePassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Current password is incorrect' });
     }
     const hash = await bcrypt.hash(newPassword, 10);
-    // Update password by id
-    await User().findByIdAndUpdate(req.user.id, { $set: { passwordHash: hash } });
+    await User().findOneAndUpdate(
+      { id: req.user.id },
+      { $set: { passwordHash: hash } }
+    );
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -83,12 +84,15 @@ exports.setPin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'PIN must be exactly 4 digits' });
     }
     const hash = await bcrypt.hash(pin, 10);
-    // Update user's transaction PIN by id
-    const result = await User().findByIdAndUpdate(
-      req.user.id,
+
+    // Use custom id field NOT MongoDB _id
+    const result = await User().findOneAndUpdate(
+      { id: req.user.id },
       { $set: { transactionPin: hash } },
       { new: true }
     );
+
+    console.log('setPin result transactionPin:', result?.transactionPin?.substring(0, 10));
 
     if (!result) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -109,9 +113,9 @@ exports.verifyPin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'PIN required' });
     }
 
-    // Find user by id
-    const user = await User().findById(req.user.id).lean();
-   
+    // Use custom id field NOT MongoDB _id
+    const user = await User().findOne({ id: req.user.id }).lean();
+    console.log('verifyPin transactionPin:', user?.transactionPin?.substring(0, 10));
 
     if (!user || !user.transactionPin) {
       return res.status(400).json({ success: false, message: 'Transaction PIN not set' });
