@@ -94,8 +94,13 @@ exports.setPin = async (req, res) => {
     await user.save();
 
     // Verify
-    const check = await User().findOne({ id: req.user.id }).lean();
-    console.log('PIN saved:', check?.transactionPin?.substring(0, 10));
+    // Verify
+const check = await User().findOne({ id: req.user.id });
+
+console.log("================================");
+console.log("User ID:", req.user.id);
+console.log("Saved transactionPin:", check.transactionPin);
+console.log("================================");
 
     res.json({ success: true, message: 'Transaction PIN set successfully' });
   } catch (err) {
