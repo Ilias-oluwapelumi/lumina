@@ -84,16 +84,23 @@ exports.setPin = async (req, res) => {
       return res.status(400).json({ success: false, message: 'PIN must be exactly 4 digits' });
     }
     const hash = await bcrypt.hash(pin, 10);
+    console.log("PIN received:", pin);
+console.log("Hash generated:", hash);
 
     // Use save() like wallet does
     const user = await User().findOne({ id: req.user.id });
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    user.transactionPin = hash;
-    await user.save();
+  console.log("Before assignment:", user.transactionPin);
 
-    // Verify
+user.transactionPin = hash;
+
+console.log("After assignment:", user.transactionPin);
+
+await user.save();
+
+console.log("After save on same object:", user.transactionPin);
     // Verify
 const check = await User().findOne({ id: req.user.id });
 
