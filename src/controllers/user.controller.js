@@ -85,16 +85,17 @@ exports.setPin = async (req, res) => {
     }
     const hash = await bcrypt.hash(pin, 10);
 
-    // Update using updateOne
-    const updateResult = await User().updateOne(
-      { id: req.user.id },
-      { $set: { transactionPin: hash } }
-    );
-    console.log('updateOne result:', JSON.stringify(updateResult));
+    // Use save() like wallet does
+    const user = await User().findOne({ id: req.user.id });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    user.transactionPin = hash;
+    await user.save();
 
-    // Verify by fetching fresh
+    // Verify
     const check = await User().findOne({ id: req.user.id }).lean();
-    console.log('PIN in DB after update:', check?.transactionPin?.substring(0, 10));
+    console.log('PIN saved:', check?.transactionPin?.substring(0, 10));
 
     res.json({ success: true, message: 'Transaction PIN set successfully' });
   } catch (err) {
@@ -104,7 +105,7 @@ exports.setPin = async (req, res) => {
 };
 // POST /api/users/verify-pin
 exports.verifyPin = async (req, res) => {
-  try {
+  try { 
     const { pin } = req.body;
     if (!pin) {
       return res.status(400).json({ success: false, message: 'PIN required' });
