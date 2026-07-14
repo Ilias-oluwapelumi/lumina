@@ -83,60 +83,13 @@ exports.setPin = async (req, res) => {
     if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
       return res.status(400).json({ success: false, message: 'PIN must be exactly 4 digits' });
     }
+
     const hash = await bcrypt.hash(pin, 10);
-    console.log("PIN received:", pin);
-console.log("Hash generated:", hash);
+    console.log('PIN received:', pin);
 
-    // Use save() like wallet does
-    const user = await User().findOne({ id: req.user.id });
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-  console.log("Before assignment:", user.transactionPin);
-
-user.transactionPin = hash;
-
-console.log("After assignment:", user.transactionPin);
-
-await user.save();
-
-console.log("After save on same object:", user.transactionPin);
-    // Verify
-const check = await User().findOne({ id: req.user.id });
-
-console.log("================================");
-console.log("User ID:", req.user.id);
-console.log("Saved transactionPin:", check.transactionPin);
-console.log("================================");
+    await db.setTransactionPin(req.user.id, hash);
 
     res.json({ success: true, message: 'Transaction PIN set successfully' });
-  } catch (err) {
-    console.error('setPin error:', err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-// POST /api/users/verify-pin
-exports.verifyPin = async (req, res) => {
-  try { 
-    const { pin } = req.body;
-    if (!pin) {
-      return res.status(400).json({ success: false, message: 'PIN required' });
-    }
-
-    // Use custom id field NOT MongoDB _id
-    const user = await User().findOne({ id: req.user.id }).lean();
-    console.log('verifyPin transactionPin:', user?.transactionPin?.substring(0, 10));
-
-    if (!user || !user.transactionPin) {
-      return res.status(400).json({ success: false, message: 'Transaction PIN not set' });
-    }
-
-    const valid = await bcrypt.compare(pin, user.transactionPin);
-    if (!valid) {
-      return res.status(401).json({ success: false, message: 'Invalid PIN' });
-    }
-
-    res.json({ success: true, message: 'PIN verified' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

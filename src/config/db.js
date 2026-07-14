@@ -107,21 +107,22 @@ const db = {
     return updated;
   },
 
-  // ← NEW: save PIN using .save()
+  // ← NEW: save PIN with direct update
   setTransactionPin: async (id, pinHash) => {
-    const user = await User.findOne({ id });
-    if (!user) throw new Error('User not found');
-    user.transactionPin = pinHash;
-    const saved = await user.save();
-    console.log('setTransactionPin saved:', saved.transactionPin?.substring(0, 10));
-    return saved;
+    const result = await User.updateOne({ id }, { $set: { transactionPin: pinHash } });
+    if (!result.matchedCount) throw new Error('User not found');
+    const fresh = await User.findOne({ id }, { transactionPin: 1 }).lean();
+    console.log('Saved transactionPin:', fresh?.transactionPin?.substring(0, 10));
+    return fresh;
   },
 
   // ← NEW: get PIN hash
   getTransactionPin: async (id) => {
-    const user = await User.findOne({ id }).lean();
+    const user = await User.findOne({ id }, { transactionPin: 1 }).lean();
+    console.log('Raw user from DB:', JSON.stringify(user));
     return user?.transactionPin || null;
   },
+  
 
   getWallet: (userId) => Wallet.findOne({ userId }).lean(),
 
