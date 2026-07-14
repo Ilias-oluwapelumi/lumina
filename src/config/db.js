@@ -109,16 +109,23 @@ const db = {
 
   // ← NEW: save PIN with direct update
   setTransactionPin: async (id, pinHash) => {
-    const result = await User.updateOne({ id }, { $set: { transactionPin: pinHash } });
+    const filter = mongoose.isValidObjectId(id)
+      ? { $or: [{ id }, { _id: id }] }
+      : { id };
+    console.log('setTransactionPin filter:', JSON.stringify(filter));
+    const result = await User.updateOne(filter, { $set: { transactionPin: pinHash } });
     if (!result.matchedCount) throw new Error('User not found');
-    const fresh = await User.findOne({ id }, { transactionPin: 1 }).lean();
+    const fresh = await User.findOne(filter, { transactionPin: 1 }).lean();
     console.log('Saved transactionPin:', fresh?.transactionPin?.substring(0, 10));
     return fresh;
   },
 
   // ← NEW: get PIN hash
   getTransactionPin: async (id) => {
-    const user = await User.findOne({ id }, { transactionPin: 1 }).lean();
+    const filter = mongoose.isValidObjectId(id)
+      ? { $or: [{ id }, { _id: id }] }
+      : { id };
+    const user = await User.findOne(filter, { transactionPin: 1 }).lean();
     console.log('Raw user from DB:', JSON.stringify(user));
     return user?.transactionPin || null;
   },

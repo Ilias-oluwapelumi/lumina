@@ -86,11 +86,17 @@ exports.setPin = async (req, res) => {
 
     const hash = await bcrypt.hash(pin, 10);
     console.log('PIN received:', pin);
+    console.log('Authenticated user:', {
+      id: req.user?.id,
+      _id: req.user?._id,
+      email: req.user?.email,
+    });
 
-    await db.setTransactionPin(req.user.id, hash);
+    await db.setTransactionPin(req.user.id || req.user._id, hash);
 
     res.json({ success: true, message: 'Transaction PIN set successfully' });
   } catch (err) {
+    console.error('setPin error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
