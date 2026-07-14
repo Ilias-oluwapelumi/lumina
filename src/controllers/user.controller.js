@@ -94,3 +94,29 @@ exports.setPin = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// POST /api/users/verify-pin
+exports.verifyPin = async (req, res) => {
+  try {
+    const { pin } = req.body;
+    if (!pin) {
+      return res.status(400).json({ success: false, message: 'PIN required' });
+    }
+
+    const transactionPin = await db.getTransactionPin(req.user.id);
+    console.log('verifyPin transactionPin:', transactionPin?.substring(0, 10));
+
+    if (!transactionPin) {
+      return res.status(400).json({ success: false, message: 'Transaction PIN not set' });
+    }
+
+    const valid = await bcrypt.compare(pin, transactionPin);
+    if (!valid) {
+      return res.status(401).json({ success: false, message: 'Invalid PIN' });
+    }
+
+    res.json({ success: true, message: 'PIN verified' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
