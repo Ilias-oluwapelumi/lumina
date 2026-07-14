@@ -8,20 +8,19 @@ mongoose.connect(process.env.MONGODB_URI)
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
 // ─── SCHEMAS ─────────────────────────────────────────────────────────────────
-
 const userSchema = new mongoose.Schema({
-  id:           { type: String, default: () => uuidv4(), unique: true },
-  fullName:     { type: String, required: true },
-  email:        { type: String, required: true, unique: true },
-  phone:        { type: String, required: true, unique: true },
-  passwordHash: { type: String, required: true },
-  kycTier:      { type: Number, default: 1 },
-  kycVerified:  { type: Boolean, default: false },
-  avatarUrl:    { type: String, default: null },
-  createdAt:    { type: String, default: () => new Date().toISOString() },
-  failedAttempts: { type: Number, default: 0 },  // ← ADD THIS
+  id:             { type: String, default: () => uuidv4(), unique: true },
+  fullName:       { type: String, required: true },
+  email:          { type: String, required: true, unique: true },
+  phone:          { type: String, required: true, unique: true },
+  passwordHash:   { type: String, required: true },
+  kycTier:        { type: Number, default: 1 },
+  kycVerified:    { type: Boolean, default: false },
+  avatarUrl:      { type: String, default: null },
+  createdAt:      { type: String, default: () => new Date().toISOString() },
+  failedAttempts: { type: Number, default: 0 },
   lockedUntil:    { type: Date, default: null },
-  transactionPin: { type: String, default: null }, // ← ADD THIS
+  transactionPin: { type: String, default: null },
 });
 
 const walletSchema = new mongoose.Schema({
@@ -49,11 +48,11 @@ const refreshTokenSchema = new mongoose.Schema({
   token: { type: String, required: true, unique: true },
 });
 
-// ✅ With these (prevents re-registration)
 const User         = mongoose.models.User         || mongoose.model('User', userSchema);
 const Wallet       = mongoose.models.Wallet       || mongoose.model('Wallet', walletSchema);
 const Transaction  = mongoose.models.Transaction  || mongoose.model('Transaction', transactionSchema);
 const RefreshToken = mongoose.models.RefreshToken || mongoose.model('RefreshToken', refreshTokenSchema);
+
 // ─── SEED DEMO USER ──────────────────────────────────────────────────────────
 async function seed() {
   const exists = await User.findOne({ phone: '08012345678' });
@@ -68,7 +67,7 @@ async function seed() {
     userId: id, balance: 250000, accountNumber: '8012345678', bankName: 'Lumina Bank',
   });
   await Transaction.insertMany([
-    { id: uuidv4(), userId: id, type: 'debit',  category: 'shopping',    title: 'Jumia Nigeria',       amount: 12500,  status: 'successful', icon: 'shopping_bag',    date: new Date('2024-10-24T14:20:00').toISOString(), reference: 'TXN001' },
+    { id: uuidv4(), userId: id, type: 'debit',  category: 'shopping',    title: 'Jumina Nigeria',       amount: 12500,  status: 'successful', icon: 'shopping_bag',    date: new Date('2024-10-24T14:20:00').toISOString(), reference: 'TXN001' },
     { id: uuidv4(), userId: id, type: 'credit', category: 'transfer',    title: 'Transfer from James', amount: 45000,  status: 'successful', icon: 'call_received',   date: new Date('2024-10-23T09:15:00').toISOString(), reference: 'TXN002' },
     { id: uuidv4(), userId: id, type: 'debit',  category: 'electricity', title: 'IKEDC Prepaid',       amount: 5000,   status: 'pending',    icon: 'bolt',            date: new Date('2024-10-22T20:45:00').toISOString(), reference: 'TXN003' },
     { id: uuidv4(), userId: id, type: 'debit',  category: 'airtime',     title: 'Airtime – MTN',       amount: 1000,   status: 'successful', icon: 'phone_android',   date: new Date('2024-10-21T11:00:00').toISOString(), reference: 'TXN004' },
@@ -99,16 +98,31 @@ const db = {
   },
 
   verifyPassword: (user, plain) => bcrypt.compare(plain, user.passwordHash),
-updateUser: async (id, fields) => {
-  const existingUser = await User.findOne({ id }).lean();
-  if (!existingUser) throw new Error('User not found');
-  await User.updateOne(
-    { _id: existingUser._id },
-    { $set: fields }
-  );
-  const updated = await User.findOne({ _id: existingUser._id }).lean();
-  return updated;
-},
+
+  updateUser: async (id, fields) => {
+    const existingUser = await User.findOne({ id }).lean();
+    if (!existingUser) throw new Error('User not found');
+    await User.updateOne({ _id: existingUser._id }, { $set: fields });
+    const updated = await User.findOne({ _id: existingUser._id }).lean();
+    return updated;
+  },
+
+  // ← NEW: save PIN using .save()
+  setTransactionPin: async (id, pinHash) => {
+    const user = await User.findOne({ id });
+    if (!user) throw new Error('User not found');
+    user.transactionPin = pinHash;
+    const saved = await user.save();
+    console.log('setTransactionPin saved:', saved.transactionPin?.substring(0, 10));
+    return saved;
+  },
+
+  // ← NEW: get PIN hash
+  getTransactionPin: async (id) => {
+    const user = await User.findOne({ id }).lean();
+    return user?.transactionPin || null;
+  },
+
   getWallet: (userId) => Wallet.findOne({ userId }).lean(),
 
   debitWallet: async (userId, amount) => {
@@ -145,19 +159,12 @@ updateUser: async (id, fields) => {
     return txn.toObject();
   },
 
-  getTransactionById: (id) => Transaction.findOne({ id }).lean(),
-getTransactionByReference: (reference) => Transaction.findOne({ reference }).lean(),
+  getTransactionById:        (id)        => Transaction.findOne({ id }).lean(),
+  getTransactionByReference: (reference) => Transaction.findOne({ reference }).lean(),
+
   storeRefreshToken:  (token) => RefreshToken.create({ token }),
   hasRefreshToken:    (token) => RefreshToken.exists({ token }),
   deleteRefreshToken: (token) => RefreshToken.deleteOne({ token }),
 };
-directUpdatePin: async (id, pinHash) => {
-  const result = await User.updateOne(
-    { id },
-    { $set: { transactionPin: pinHash } }
-  );
-  console.log('MongoDB updateOne result:', JSON.stringify(result));
-  return result;
-},
 
 module.exports = db;
