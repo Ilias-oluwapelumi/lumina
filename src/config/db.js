@@ -93,11 +93,24 @@ async function seed() {
 
 mongoose.connection.once('open', seed);
 
-// Helper to query flexibly by custom id (UUID) or Mongo _id
+/// Helper to query flexibly by custom id (UUID) or Mongo _id
+// Helper to query flexibly by custom id (UUID string) or Mongo native ObjectId
 const getFilter = (id) => {
-  return mongoose.isValidObjectId(id) ? { $or: [{ id }, { _id: id }] } : { id };
-};
+  if (!id) return {};
 
+  // If it's a UUID string (contains dashes), look ONLY at the custom 'id' field
+  if (typeof id === 'string' && id.includes('-')) {
+    return { id: id };
+  }
+
+  // If it's a valid MongoDB hex ObjectId string or object
+  if (mongoose.isValidObjectId(id)) {
+    return { _id: id };
+  }
+
+  // Fallback default
+  return { id: id };
+};
 // ─── DB INTERFACE ─────────────────────────────────────────────────────────────
 const db = {
   findUserByPhone: (phone) => User.findOne({ phone }).lean(),
