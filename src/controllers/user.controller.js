@@ -83,6 +83,12 @@ exports.setPin = async (req, res) => {
     try {
 
         const { pin } = req.body;
+        // ─── 🔍 INVESTIGATE THE AUTH TOKEN CONTENT ────────────────
+        console.log("=========================================");
+        console.log("👉 Full req.user object received:", req.user);
+        console.log("👉 req.user.id value:", req.user?.id);
+        console.log("👉 req.user._id value:", req.user?._id);
+        console.log("=========================================");
 
         if (!pin) {
             return res.status(400).json({
