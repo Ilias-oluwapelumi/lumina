@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const verifyTransactionPin = require('../middleware/verifyTransactionPin');
+const verifytransactionPin = require('../middleware/verifytransactionPin');
 
 const authCtrl = require('../controllers/auth.controller');
 const walletCtrl = require('../controllers/wallet.controller');
