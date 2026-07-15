@@ -104,7 +104,7 @@ exports.setPin = async (req, res) => {
             });
         }
 
-        const pinData = await db.getTransactionPin(req.user.id);
+        const pinData = await db.getTransactionPin(req.user);
 
         // Prevent resetting an existing PIN
         if (pinData && pinData.transactionPin) {
@@ -116,7 +116,7 @@ exports.setPin = async (req, res) => {
 
         const hash = await bcrypt.hash(pin, 12);
 
-        await db.setTransactionPin(req.user.id, hash);
+        await db.setTransactionPin(req.user, hash);
 
         return res.json({
             success: true,
@@ -157,7 +157,7 @@ exports.changePin = async (req, res) => {
             });
         }
 
-        const pinData = await db.getTransactionPin(req.user.id);
+        const pinData = await db.getTransactionPin(req.user);
 
         if (!pinData || !pinData.transactionPin) {
             return res.status(400).json({
@@ -215,7 +215,7 @@ exports.verifyPin = async (req, res) => {
             });
         }
 
-        const pinData = await db.getTransactionPin(req.user.id);
+        const pinData = await db.getTransactionPin(req.user);
 
         if (!pinData || !pinData.transactionPin) {
             return res.status(400).json({
@@ -242,7 +242,7 @@ exports.verifyPin = async (req, res) => {
 
         if (!valid) {
 
-            await db.increasePinAttempts(req.user.id);
+            await db.increasePinAttempts(req.user);
 
             return res.status(401).json({
                 success: false,
