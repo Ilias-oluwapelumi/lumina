@@ -20,9 +20,20 @@ const userSchema = new mongoose.Schema({
   createdAt:      { type: String, default: () => new Date().toISOString() },
   failedAttempts: { type: Number, default: 0 },
   lockedUntil:    { type: Date, default: null },
-  transactionPin: { type: String, default: null },
-});
+ transactionPin: {
+    type: String,
+    default: null,
+},
 
+pinAttempts: {
+    type: Number,
+    default: 0,
+},
+
+pinLockedUntil: {
+    type: Date,
+    default: null,
+}}),
 const walletSchema = new mongoose.Schema({
   userId:        { type: String, required: true, unique: true },
   balance:       { type: Number, default: 0 },
@@ -122,14 +133,40 @@ const db = {
 
   // ← NEW: get PIN hash
   getTransactionPin: async (id) => {
+
     const filter = mongoose.isValidObjectId(id)
-      ? { $or: [{ id }, { _id: id }] }
-      : { id };
-    const user = await User.findOne(filter, { transactionPin: 1 }).lean();
-    console.log('Raw user from DB:', JSON.stringify(user));
-    return user?.transactionPin || null;
-  },
-  
+        ? { $or: [{ id }, { _id: id }] }
+        : { id };
+
+    const user = await User.findOne(
+        filter,
+        {
+            transactionPin: 1,
+            pinAttempts: 1,
+            pinLockedUntil: 1,
+        }
+    ).lean();
+
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    return user;
+},
+resetPinAttempts: async (id) => {
+
+    const filter = mongoose.isValidObjectId(id)
+        ? { $or: [{ id }, { _id: id }] }
+        : { id };
+
+    await User.updateOne(filter, {
+        $set: {
+            pinAttempts: 0,
+            pinLockedUntil: null,
+        }
+    });
+
+},
 
   getWallet: (userId) => Wallet.findOne({ userId }).lean(),
 
