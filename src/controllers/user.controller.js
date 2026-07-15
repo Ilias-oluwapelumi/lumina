@@ -77,8 +77,7 @@ exports.getDashboardSummary = async (req, res) => {
 };
 
 // POST /api/users/set-pin
-const bcrypt = require('bcryptjs');
-const db = require('../config/db');
+
 
 exports.setPin = async (req, res) => {
     try {
@@ -129,29 +128,137 @@ exports.setPin = async (req, res) => {
 
     }
 };
+exports.changePin = async (req, res) => {
 
+    try {
+
+        const {
+            oldPin,
+            newPin
+        } = req.body;
+
+        if (!oldPin || !newPin) {
+            return res.status(400).json({
+                success: false,
+                message: 'Old PIN and New PIN are required'
+            });
+        }
+
+        if (!/^\d{4}$/.test(newPin)) {
+            return res.status(400).json({
+                success: false,
+                message: 'New PIN must be exactly 4 digits'
+            });
+        }
+
+        const pinData = await db.getTransactionPin(req.user.id);
+
+        if (!pinData || !pinData.transactionPin) {
+            return res.status(400).json({
+                success: false,
+                message: 'Transaction PIN not found'
+            });
+        }
+
+        const valid = await bcrypt.compare(
+            oldPin,
+            pinData.transactionPin
+        );
+
+        if (!valid) {
+            return res.status(401).json({
+                success: false,
+                message: 'Old PIN is incorrect'
+            });
+        }
+
+        const hash = await bcrypt.hash(newPin, 12);
+
+        await db.changeTransactionPin(
+            req.user.id,
+            hash
+        );
+
+        return res.json({
+            success: true,
+            message: 'Transaction PIN changed successfully'
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+
+    }
+
+};
 // POST /api/users/verify-pin
 exports.verifyPin = async (req, res) => {
-  try {
-    const { pin } = req.body;
-    if (!pin) {
-      return res.status(400).json({ success: false, message: 'PIN required' });
+    try {
+
+        const { pin } = req.body;
+
+        if (!pin) {
+            return res.status(400).json({
+                success: false,
+                message: 'PIN is required'
+            });
+        }
+
+        const pinData = await db.getTransactionPin(req.user.id);
+
+        if (!pinData || !pinData.transactionPin) {
+            return res.status(400).json({
+                success: false,
+                message: 'Transaction PIN not set'
+            });
+        }
+
+        // Check if PIN is locked
+        if (
+            pinData.pinLockedUntil &&
+            new Date(pinData.pinLockedUntil) > new Date()
+        ) {
+            return res.status(423).json({
+                success: false,
+                message: 'PIN is temporarily locked. Try again later.'
+            });
+        }
+
+        const valid = await bcrypt.compare(
+            pin,
+            pinData.transactionPin
+        );
+
+        if (!valid) {
+
+            await db.increasePinAttempts(req.user.id);
+
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid transaction PIN'
+            });
+        }
+
+        await db.resetPinAttempts(req.user.id);
+
+        return res.json({
+            success: true,
+            message: 'PIN verified successfully'
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+
     }
-
-    const transactionPin = await db.getTransactionPin(req.user.id);
-    console.log('verifyPin transactionPin:', transactionPin?.substring(0, 10));
-
-    if (!transactionPin) {
-      return res.status(400).json({ success: false, message: 'Transaction PIN not set' });
-    }
-
-    const valid = await bcrypt.compare(pin, transactionPin);
-    if (!valid) {
-      return res.status(401).json({ success: false, message: 'Invalid PIN' });
-    }
-
-    res.json({ success: true, message: 'PIN verified' });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
 };

@@ -9,31 +9,32 @@ mongoose.connect(process.env.MONGODB_URI)
 
 // ─── SCHEMAS ─────────────────────────────────────────────────────────────────
 const userSchema = new mongoose.Schema({
-  id:             { type: String, default: () => uuidv4(), unique: true },
-  fullName:       { type: String, required: true },
-  email:          { type: String, required: true, unique: true },
-  phone:          { type: String, required: true, unique: true },
-  passwordHash:   { type: String, required: true },
-  kycTier:        { type: Number, default: 1 },
-  kycVerified:    { type: Boolean, default: false },
-  avatarUrl:      { type: String, default: null },
-  createdAt:      { type: String, default: () => new Date().toISOString() },
-  failedAttempts: { type: Number, default: 0 },
-  lockedUntil:    { type: Date, default: null },
- transactionPin: {
+  id: { type: String, default: () => uuidv4(), unique: true },
+  fullName: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  phone: { type: String, required: true, unique: true },
+  passwordHash: { type: String, required: true },
+
+  transactionPin: {
     type: String,
     default: null,
-},
+  },
 
-pinAttempts: {
+  pinAttempts: {
     type: Number,
     default: 0,
-},
+  },
 
-pinLockedUntil: {
+  pinLockedUntil: {
     type: Date,
     default: null,
-}}),
+  },
+
+  kycTier: { type: Number, default: 1 },
+  kycVerified: { type: Boolean, default: false },
+  avatarUrl: { type: String, default: null },
+  createdAt: { type: String, default: () => new Date().toISOString() },
+});
 const walletSchema = new mongoose.Schema({
   userId:        { type: String, required: true, unique: true },
   balance:       { type: Number, default: 0 },
@@ -163,6 +164,47 @@ resetPinAttempts: async (id) => {
         $set: {
             pinAttempts: 0,
             pinLockedUntil: null,
+        }
+    });
+
+},
+increasePinAttempts: async (id) => {
+
+    const filter = mongoose.isValidObjectId(id)
+        ? { $or: [{ id }, { _id: id }] }
+        : { id };
+
+    const user = await User.findOne(filter);
+
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    user.pinAttempts += 1;
+
+    if (user.pinAttempts >= 5) {
+
+        user.pinAttempts = 0;
+
+        user.pinLockedUntil =
+            new Date(Date.now() + 30 * 60 * 1000);
+
+    }
+
+    await user.save();
+
+    return user;
+
+},
+changeTransactionPin: async (id, pinHash) => {
+
+    const filter = mongoose.isValidObjectId(id)
+        ? { $or: [{ id }, { _id: id }] }
+        : { id };
+
+    await User.updateOne(filter, {
+        $set: {
+            transactionPin: pinHash,
         }
     });
 
