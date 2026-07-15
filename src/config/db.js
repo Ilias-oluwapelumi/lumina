@@ -93,7 +93,6 @@ async function seed() {
 
 mongoose.connection.once('open', seed);
 
-/// Helper to query flexibly by custom id (UUID) or Mongo _id
 // Helper to query flexibly by custom id (UUID string) or Mongo native ObjectId
 const getFilter = (id) => {
   if (!id) return {};
@@ -111,10 +110,11 @@ const getFilter = (id) => {
   // Fallback default
   return { id: id };
 };
+
 // ─── DB INTERFACE ─────────────────────────────────────────────────────────────
 const db = {
   findUserByPhone: (phone) => User.findOne({ phone }).lean(),
-  findUserById:    (id)    => User.findOne({ id }).lean(),
+  findUserById:    (id)    => User.findOne(getFilter(id)).lean(), // ✅ Fixed to use getFilter helper
   findUserByEmail: (email) => User.findOne({ email }).lean(),
 
   createUser: async ({ fullName, email, phone, password }) => {
@@ -131,7 +131,7 @@ const db = {
   verifyPassword: (user, plain) => bcrypt.compare(plain, user.passwordHash),
 
   updateUser: async (id, fields) => {
-    const existingUser = await User.findOne({ id }).lean();
+    const existingUser = await User.findOne(getFilter(id)).lean(); // ✅ Fixed to use getFilter helper
     if (!existingUser) throw new Error('User not found');
     await User.updateOne({ _id: existingUser._id }, { $set: fields });
     return await User.findOne({ _id: existingUser._id }).lean();
