@@ -35,6 +35,7 @@ const userSchema = new mongoose.Schema({
   avatarUrl: { type: String, default: null },
   createdAt: { type: String, default: () => new Date().toISOString() },
 });
+
 const walletSchema = new mongoose.Schema({
   userId:        { type: String, required: true, unique: true },
   balance:       { type: Number, default: 0 },
@@ -79,18 +80,23 @@ async function seed() {
     userId: id, balance: 250000, accountNumber: '8012345678', bankName: 'Lumina Bank',
   });
   await Transaction.insertMany([
-    { id: uuidv4(), userId: id, type: 'debit',  category: 'shopping',    title: 'Jumina Nigeria',       amount: 12500,  status: 'successful', icon: 'shopping_bag',    date: new Date('2024-10-24T14:20:00').toISOString(), reference: 'TXN001' },
-    { id: uuidv4(), userId: id, type: 'credit', category: 'transfer',    title: 'Transfer from James', amount: 45000,  status: 'successful', icon: 'call_received',   date: new Date('2024-10-23T09:15:00').toISOString(), reference: 'TXN002' },
-    { id: uuidv4(), userId: id, type: 'debit',  category: 'electricity', title: 'IKEDC Prepaid',       amount: 5000,   status: 'pending',    icon: 'bolt',            date: new Date('2024-10-22T20:45:00').toISOString(), reference: 'TXN003' },
-    { id: uuidv4(), userId: id, type: 'debit',  category: 'airtime',     title: 'Airtime – MTN',       amount: 1000,   status: 'successful', icon: 'phone_android',   date: new Date('2024-10-21T11:00:00').toISOString(), reference: 'TXN004' },
-    { id: uuidv4(), userId: id, type: 'debit',  category: 'cable',       title: 'DSTV Compact',        amount: 15700,  status: 'successful', icon: 'tv',              date: new Date('2024-10-20T08:30:00').toISOString(), reference: 'TXN005' },
-    { id: uuidv4(), userId: id, type: 'credit', category: 'fund',        title: 'Wallet Funding',      amount: 100000, status: 'successful', icon: 'account_balance', date: new Date('2024-10-19T16:00:00').toISOString(), reference: 'TXN006' },
-    { id: uuidv4(), userId: id, type: 'debit',  category: 'data',        title: 'Data – MTN 5GB',      amount: 1500,   status: 'successful', icon: 'wifi',            date: new Date('2024-10-18T09:00:00').toISOString(), reference: 'TXN007' },
+    { id: uuidv4(), userId: id, type: 'debit',  category: 'shopping',    title: 'Jumia Nigeria',       amount: 12500,  status: 'successful', icon: 'shopping_bag',    date: new Date('2024-10-24T14:20:00Z').toISOString(), reference: 'TXN001' },
+    { id: uuidv4(), userId: id, type: 'credit', category: 'transfer',    title: 'Transfer from James', amount: 45000,  status: 'successful', icon: 'call_received',   date: new Date('2024-10-23T09:15:00Z').toISOString(), reference: 'TXN002' },
+    { id: uuidv4(), userId: id, type: 'debit',  category: 'electricity', title: 'IKEDC Prepaid',       amount: 5000,   status: 'pending',    icon: 'bolt',            date: new Date('2024-10-22T20:45:00Z').toISOString(), reference: 'TXN003' },
+    { id: uuidv4(), userId: id, type: 'debit',  category: 'airtime',     title: 'Airtime – MTN',       amount: 1000,   status: 'successful', icon: 'phone_android',   date: new Date('2024-10-21T11:00:00Z').toISOString(), reference: 'TXN004' },
+    { id: uuidv4(), userId: id, type: 'debit',  category: 'cable',       title: 'DSTV Compact',        amount: 15700,  status: 'successful', icon: 'tv',              date: new Date('2024-10-20T08:30:00Z').toISOString(), reference: 'TXN005' },
+    { id: uuidv4(), userId: id, type: 'credit', category: 'fund',        title: 'Wallet Funding',      amount: 100000, status: 'successful', icon: 'account_balance', date: new Date('2024-10-19T16:00:00Z').toISOString(), reference: 'TXN006' },
+    { id: uuidv4(), userId: id, type: 'debit',  category: 'data',        title: 'Data – MTN 5GB',      amount: 1500,   status: 'successful', icon: 'wifi',            date: new Date('2024-10-18T09:00:00Z').toISOString(), reference: 'TXN007' },
   ]);
   console.log('✅ Demo DB seeded — phone: 08012345678 | password: password123');
 }
 
 mongoose.connection.once('open', seed);
+
+// Helper to query flexibly by custom id (UUID) or Mongo _id
+const getFilter = (id) => {
+  return mongoose.isValidObjectId(id) ? { $or: [{ id }, { _id: id }] } : { id };
+};
 
 // ─── DB INTERFACE ─────────────────────────────────────────────────────────────
 const db = {
@@ -115,101 +121,75 @@ const db = {
     const existingUser = await User.findOne({ id }).lean();
     if (!existingUser) throw new Error('User not found');
     await User.updateOne({ _id: existingUser._id }, { $set: fields });
-    const updated = await User.findOne({ _id: existingUser._id }).lean();
-    return updated;
+    return await User.findOne({ _id: existingUser._id }).lean();
   },
 
-  // ← NEW: save PIN with direct update
+  // PIN Operations (Polymorphic, safe, and consolidated)
+  getTransactionPin: async (id) => {
+    const user = await User.findOne(
+      getFilter(id),
+      {
+        transactionPin: 1,
+        pinAttempts: 1,
+        pinLockedUntil: 1,
+      }
+    ).lean();
+
+    if (!user) throw new Error('User not found');
+    return user;
+  },
+
   setTransactionPin: async (id, pinHash) => {
-    const filter = mongoose.isValidObjectId(id)
-      ? { $or: [{ id }, { _id: id }] }
-      : { id };
-    console.log('setTransactionPin filter:', JSON.stringify(filter));
-    const result = await User.updateOne(filter, { $set: { transactionPin: pinHash } });
+    const filter = getFilter(id);
+    const result = await User.updateOne(filter, { 
+      $set: { 
+        transactionPin: pinHash,
+        pinAttempts: 0,
+        pinLockedUntil: null
+      } 
+    });
     if (!result.matchedCount) throw new Error('User not found');
     const fresh = await User.findOne(filter, { transactionPin: 1 }).lean();
-    console.log('Saved transactionPin:', fresh?.transactionPin?.substring(0, 10));
     return fresh;
   },
 
-  // ← NEW: get PIN hash
-  getTransactionPin: async (id) => {
-
-    const filter = mongoose.isValidObjectId(id)
-        ? { $or: [{ id }, { _id: id }] }
-        : { id };
-
-    const user = await User.findOne(
-        filter,
-        {
-            transactionPin: 1,
-            pinAttempts: 1,
-            pinLockedUntil: 1,
-        }
-    ).lean();
-
-    if (!user) {
-        throw new Error('User not found');
-    }
-
-    return user;
-},
-resetPinAttempts: async (id) => {
-
-    const filter = mongoose.isValidObjectId(id)
-        ? { $or: [{ id }, { _id: id }] }
-        : { id };
-
-    await User.updateOne(filter, {
-        $set: {
-            pinAttempts: 0,
-            pinLockedUntil: null,
-        }
+  changeTransactionPin: async (id, pinHash) => {
+    const result = await User.updateOne(getFilter(id), {
+      $set: {
+        transactionPin: pinHash,
+        pinAttempts: 0,
+        pinLockedUntil: null
+      }
     });
+    if (!result.matchedCount) throw new Error('User not found');
+    return result;
+  },
 
-},
-increasePinAttempts: async (id) => {
+  increasePinAttempts: async (id) => {
+    const user = await User.findOne(getFilter(id));
+    if (!user) throw new Error('User not found');
 
-    const filter = mongoose.isValidObjectId(id)
-        ? { $or: [{ id }, { _id: id }] }
-        : { id };
-
-    const user = await User.findOne(filter);
-
-    if (!user) {
-        throw new Error('User not found');
-    }
-
-    user.pinAttempts += 1;
+    user.pinAttempts = (user.pinAttempts || 0) + 1;
 
     if (user.pinAttempts >= 5) {
-
-        user.pinAttempts = 0;
-
-        user.pinLockedUntil =
-            new Date(Date.now() + 30 * 60 * 1000);
-
+      user.pinAttempts = 0;
+      user.pinLockedUntil = new Date(Date.now() + 30 * 60 * 1000); // Locked for 30 minutes
     }
 
     await user.save();
-
     return user;
+  },
 
-},
-changeTransactionPin: async (id, pinHash) => {
-
-    const filter = mongoose.isValidObjectId(id)
-        ? { $or: [{ id }, { _id: id }] }
-        : { id };
-
-    await User.updateOne(filter, {
-        $set: {
-            transactionPin: pinHash,
-        }
+  resetPinAttempts: async (id) => {
+    await User.updateOne(getFilter(id), {
+      $set: {
+        pinAttempts: 0,
+        pinLockedUntil: null,
+      }
     });
+  },
 
-},
-
+  // Wallet Operations
   getWallet: (userId) => Wallet.findOne({ userId }).lean(),
 
   debitWallet: async (userId, amount) => {
@@ -229,6 +209,7 @@ changeTransactionPin: async (id, pinHash) => {
     return w.toObject();
   },
 
+  // Transaction Operations
   getUserTransactions: async (userId, { page = 1, limit = 20, category } = {}) => {
     const filter = { userId };
     if (category) filter.category = category;
@@ -249,6 +230,7 @@ changeTransactionPin: async (id, pinHash) => {
   getTransactionById:        (id)        => Transaction.findOne({ id }).lean(),
   getTransactionByReference: (reference) => Transaction.findOne({ reference }).lean(),
 
+  // Token Store Operations
   storeRefreshToken:  (token) => RefreshToken.create({ token }),
   hasRefreshToken:    (token) => RefreshToken.exists({ token }),
   deleteRefreshToken: (token) => RefreshToken.deleteOne({ token }),
