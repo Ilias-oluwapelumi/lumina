@@ -97,25 +97,33 @@ mongoose.connection.once('open', seed);
 const getFilter = (id) => {
   if (!id) return {};
 
-  // If id is an object that contains an _id (like a full req.user object passed in)
-  if (id._id && mongoose.isValidObjectId(id._id)) {
-    return { _id: id._id };
+  // If a full user document was passed
+  if (typeof id === "object") {
+    if (id.id) {
+      return { id: id.id };
+    }
+
+    if (id._id) {
+      return { _id: id._id };
+    }
   }
 
-  // If it's directly a valid MongoDB hex ObjectId string or object
-  if (mongoose.isValidObjectId(id)) {
+  // UUIDs always contain dashes
+  if (typeof id === "string" && id.includes("-")) {
+    return { id };
+  }
+
+  // Only use Mongo _id if it does NOT look like a UUID
+  if (
+    typeof id === "string" &&
+    mongoose.isValidObjectId(id) &&
+    !id.includes("-")
+  ) {
     return { _id: id };
   }
 
-  // If it's a UUID string (contains dashes), explicitly target the custom 'id' field
-  if (typeof id === 'string' && id.includes('-')) {
-    return { id: id };
-  }
-
-  // Fallback default
-  return { id: id };
+  return { id };
 };
-
 // ─── DB INTERFACE ─────────────────────────────────────────────────────────────
 const db = {
   findUserByPhone: (phone) => User.findOne({ phone }).lean(),
@@ -160,6 +168,8 @@ const db = {
 
   setTransactionPin: async (id, pinHash) => {
     const filter = getFilter(id);
+
+    console.log("FILTER =".filter);
     const result = await User.updateOne(filter, { 
       $set: { 
         transactionPin: pinHash,
