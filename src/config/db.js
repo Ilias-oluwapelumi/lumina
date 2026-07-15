@@ -97,14 +97,19 @@ mongoose.connection.once('open', seed);
 const getFilter = (id) => {
   if (!id) return {};
 
-  // If it's a UUID string (contains dashes), look ONLY at the custom 'id' field
-  if (typeof id === 'string' && id.includes('-')) {
-    return { id: id };
+  // If id is an object that contains an _id (like a full req.user object passed in)
+  if (id._id && mongoose.isValidObjectId(id._id)) {
+    return { _id: id._id };
   }
 
-  // If it's a valid MongoDB hex ObjectId string or object
+  // If it's directly a valid MongoDB hex ObjectId string or object
   if (mongoose.isValidObjectId(id)) {
     return { _id: id };
+  }
+
+  // If it's a UUID string (contains dashes), explicitly target the custom 'id' field
+  if (typeof id === 'string' && id.includes('-')) {
+    return { id: id };
   }
 
   // Fallback default
@@ -114,7 +119,7 @@ const getFilter = (id) => {
 // ─── DB INTERFACE ─────────────────────────────────────────────────────────────
 const db = {
   findUserByPhone: (phone) => User.findOne({ phone }).lean(),
-  findUserById:    (id)    => User.findOne(getFilter(id)).lean(), // ✅ Fixed to use getFilter helper
+  findUserById:    (id)    => User.findOne(getFilter(id)).lean(), 
   findUserByEmail: (email) => User.findOne({ email }).lean(),
 
   createUser: async ({ fullName, email, phone, password }) => {
@@ -131,7 +136,8 @@ const db = {
   verifyPassword: (user, plain) => bcrypt.compare(plain, user.passwordHash),
 
   updateUser: async (id, fields) => {
-    const existingUser = await User.findOne(getFilter(id)).lean(); // ✅ Fixed to use getFilter helper
+    const filter = getFilter(id);
+    const existingUser = await User.findOne(filter).lean();
     if (!existingUser) throw new Error('User not found');
     await User.updateOne({ _id: existingUser._id }, { $set: fields });
     return await User.findOne({ _id: existingUser._id }).lean();
@@ -167,7 +173,8 @@ const db = {
   },
 
   changeTransactionPin: async (id, pinHash) => {
-    const result = await User.updateOne(getFilter(id), {
+    const filter = getFilter(id);
+    const result = await User.updateOne(filter, {
       $set: {
         transactionPin: pinHash,
         pinAttempts: 0,
@@ -179,7 +186,8 @@ const db = {
   },
 
   increasePinAttempts: async (id) => {
-    const user = await User.findOne(getFilter(id));
+    const filter = getFilter(id);
+    const user = await User.findOne(filter);
     if (!user) throw new Error('User not found');
 
     user.pinAttempts = (user.pinAttempts || 0) + 1;
