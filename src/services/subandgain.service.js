@@ -111,11 +111,75 @@ async function queryAirtime(trans_id) {
     });
 
 }
+/**
+ * Buy Data
+ */
+async function buyData({
+    network,
+    dataPlan,
+    phone,
+}) {
+    try {
+
+        const response = await api.get("/data.php", {
+            params: {
+                username,
+                apiKey,
+                network: network.toUpperCase(),
+                dataPlan,
+                phoneNumber: phone,
+            },
+        });
+
+        console.log("FULL SUBANDGAIN DATA RESPONSE");
+        console.log(response.data);
+
+        return response.data;
+
+    } catch (err) {
+
+        if (err.response) {
+            throw new Error(
+                err.response.data?.description ||
+                err.response.data?.message ||
+                "SubAndGain Data API Error"
+            );
+        }
+
+        throw new Error(err.message);
+    }
+}
+
+/**
+ * Get Data Bundles
+ */
+async function getDataBundles() {
+    try {
+
+        const response = await api.get("/databundles.php");
+
+        return response.data;
+
+    } catch (err) {
+
+        if (err.response) {
+            throw new Error(
+                err.response.data?.description ||
+                "Unable to fetch data bundles"
+            );
+        }
+
+        throw new Error(err.message);
+    }
+}
 
 module.exports = {
 
     buyAirtime,
+    queryAirtime,
+    buyData,
+    getDataBundles,
+
 
     queryAirtime,
-
 };
