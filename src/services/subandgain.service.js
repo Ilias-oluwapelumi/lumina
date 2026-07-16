@@ -153,9 +153,7 @@ async function buyData({
 /**
  * Get Data Bundles
  */
-/**
- * Get Data Bundles
- */
+
 async function getDataPlans(network) {
 
     const apiNetwork = NETWORKS[network];
@@ -166,20 +164,24 @@ async function getDataPlans(network) {
 
     const bundles = await request("/databundles.php");
 
-    // SubAndGain returns one big object containing all networks.
-    // Extract only the selected network.
+    // Find the requested network
+    const networkData = bundles.find(
+        item => item.NETWORK === apiNetwork
+    );
 
-    const plans = bundles[apiNetwork] || [];
+    if (!networkData) {
+        throw new Error("Network not found");
+    }
+    console.log(networkData.BUNDLE[0]);
 
-    return plans.map(plan => ({
+    return networkData.BUNDLE.map(plan => ({
         id: String(plan.dataPlan),
         name: plan.dataBundle,
-        price: Number(
-            String(plan.price || 0).replace(/[₦,]/g, "")
-        ),
+        price: Number(String(plan.price || "0").replace(/[₦,]/g, "")),
         validity: plan.duration || "",
         network: apiNetwork,
     }));
+
 }
 
 module.exports = {
