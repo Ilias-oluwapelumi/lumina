@@ -129,7 +129,7 @@ exports.buyAirtime = async (req, res) => {
 exports.getDataPlans = async (req, res) => {
   try {
     const { network } = req.query;
-    const plans = await vtpass.getDataPlans(network);
+    const plans = await subAndGain.getDataPlans(network);
     res.json({ success: true, data: { network, plans } });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -140,7 +140,7 @@ exports.getDataPlans = async (req, res) => {
 exports.buyData = async (req, res) => {
   try {
     const { network, phone, planId } = req.body;
-    const plans = await vtpass.getDataPlans(network);
+    const plans = await subAndGain.getDataPlans(network);
     const plan = plans.find(p => p.id === planId);
     if (!plan) return res.status(400).json({ success: false, message: 'Invalid data plan' });
     await vtpass.buyData({ network, phone, planId, amount: plan.price });
