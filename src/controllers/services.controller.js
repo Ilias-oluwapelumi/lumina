@@ -1,6 +1,7 @@
 const db = require('../config/db');         // ← one ../
 //const vtpass = require('../services/vtpass'); 
-const subAndGain = require('../services/subandgain.service');// ← one ../
+const subAndGain = require('../services/subandgain.service');
+console.log(subAndGain);// ← one ../
 
 // GET /api/services/networks
 exports.getNetworks = (_req, res) => {
