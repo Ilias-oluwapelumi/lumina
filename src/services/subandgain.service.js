@@ -153,33 +153,38 @@ async function buyData({
 /**
  * Get Data Bundles
  */
-async function getDataBundles() {
-    try {
+/**
+ * Get Data Bundles
+ */
+async function getDataPlans(network) {
 
-        const response = await api.get("/databundles.php");
+    const apiNetwork = NETWORKS[network];
 
-        return response.data;
-
-    } catch (err) {
-
-        if (err.response) {
-            throw new Error(
-                err.response.data?.description ||
-                "Unable to fetch data bundles"
-            );
-        }
-
-        throw new Error(err.message);
+    if (!apiNetwork) {
+        throw new Error("Unsupported Network");
     }
+
+    const bundles = await request("/databundles.php");
+
+    // SubAndGain returns one big object containing all networks.
+    // Extract only the selected network.
+
+    const plans = bundles[apiNetwork] || [];
+
+    return plans.map(plan => ({
+        id: String(plan.dataPlan),
+        name: plan.dataBundle,
+        price: Number(
+            String(plan.price || 0).replace(/[₦,]/g, "")
+        ),
+        validity: plan.duration || "",
+        network: apiNetwork,
+    }));
 }
 
 module.exports = {
-
     buyAirtime,
-    queryAirtime,
     buyData,
-    getDataBundles,
-
-
     queryAirtime,
+    getDataPlans,
 };

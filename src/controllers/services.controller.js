@@ -22,142 +22,249 @@ exports.getDiscos = (_req, res) => {
 
 // POST /api/services/airtime
 exports.buyAirtime = async (req, res) => {
-   console.log("===== BUY AIRTIME CONTROLLER HIT =====");
-    try {
+  console.log("===== BUY AIRTIME CONTROLLER HIT =====");
+  try {
 
-        const { network, phone, amount } = req.body;
+    const { network, phone, amount } = req.body;
 
-        if (!network || !phone || !amount || Number(amount) < 50) {
-            return res.status(400).json({
-                success: false,
-                message: "Network, phone and amount (minimum ₦50) are required"
-            });
-        }
-
-        // Check wallet balance first
-        const currentWallet = await db.getWallet(req.user.id);
-
-        if (!currentWallet) {
-            return res.status(404).json({
-                success: false,
-                message: "Wallet not found"
-            });
-        }
-
-        if (currentWallet.balance < Number(amount)) {
-            return res.status(400).json({
-                success: false,
-                message: "Insufficient wallet balance"
-            });
-        }
-
-        // Call SubAndGain
-        const response = await subAndGain.buyAirtime({
-            network,
-            phone,
-            amount: Number(amount),
-        });
-
-        console.log("SubAndGain Response:", response);
-
-        // Only continue if provider approved
-        if (
-            response.status !== "Approved" &&
-            response.status !== "SUCCESS"
-        ) {
-
-            console.log("FULL SUBANDGAIN RESPONSE");
-            console.log(response);
-            return res.status(400).json({
-                success: false,
-                message: response.message || "Airtime purchase failed",
-                provider: response
-            });
-        }
-
-        // Debit wallet
-        const wallet = await db.debitWallet(
-            req.user.id,
-            Number(amount)
-        );
-
-        // Create our own reference
-        const reference = `AIR${Date.now()}`;
-
-        const txn = await db.createTransaction({
-            userId: req.user.id,
-            type: "debit",
-            category: "airtime",
-            title: `Airtime - ${network}`,
-            amount: Number(amount),
-            status: "successful",
-            icon: "phone_android",
-            reference,
-
-            meta: {
-                network,
-                phone,
-                providerReference:
-                    response.trans_id || null,
-                providerResponse: response,
-            },
-        });
-
-        return res.json({
-            success: true,
-            message: "Airtime purchased successfully",
-            data: {
-                wallet,
-                transaction: txn,
-                provider: response
-            }
-        });
-
-    } catch (err) {
-
-        console.error(err);
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
-
+    if (!network || !phone || !amount || Number(amount) < 50) {
+      return res.status(400).json({
+        success: false,
+        message: "Network, phone and amount (minimum ₦50) are required"
+      });
     }
+
+    // Check wallet balance first
+    const currentWallet = await db.getWallet(req.user.id);
+
+    if (!currentWallet) {
+      return res.status(404).json({
+        success: false,
+        message: "Wallet not found"
+      });
+    }
+
+    if (currentWallet.balance < Number(amount)) {
+      return res.status(400).json({
+        success: false,
+        message: "Insufficient wallet balance"
+      });
+    }
+
+    // Call SubAndGain
+    const response = await subAndGain.buyAirtime({
+      network,
+      phone,
+      amount: Number(amount),
+    });
+
+    console.log("SubAndGain Response:", response);
+
+    // Only continue if provider approved
+    if (
+      response.status !== "Approved" &&
+      response.status !== "SUCCESS"
+    ) {
+
+      console.log("FULL SUBANDGAIN RESPONSE");
+      console.log(response);
+      return res.status(400).json({
+        success: false,
+        message: response.message || "Airtime purchase failed",
+        provider: response
+      });
+    }
+
+    // Debit wallet
+    const wallet = await db.debitWallet(
+      req.user.id,
+      Number(amount)
+    );
+
+    // Create our own reference
+    const reference = `AIR${Date.now()}`;
+
+    const txn = await db.createTransaction({
+      userId: req.user.id,
+      type: "debit",
+      category: "airtime",
+      title: `Airtime - ${network}`,
+      amount: Number(amount),
+      status: "successful",
+      icon: "phone_android",
+      reference,
+
+      meta: {
+        network,
+        phone,
+        providerReference:
+          response.trans_id || null,
+        providerResponse: response,
+      },
+    });
+
+    return res.json({
+      success: true,
+      message: "Airtime purchased successfully",
+      data: {
+        wallet,
+        transaction: txn,
+        provider: response
+      }
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+
+  }
 };
 
 // GET /api/services/data/plans
 exports.getDataPlans = async (req, res) => {
   try {
+
     const { network } = req.query;
+
     const plans = await subAndGain.getDataPlans(network);
-    res.json({ success: true, data: { network, plans } });
+
+    return res.json({
+      success: true,
+      data: {
+        network,
+        plans,
+      },
+    });
+
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+
   }
 };
 
 // POST /api/services/data
 exports.buyData = async (req, res) => {
+  console.log("===== BUY DATA CONTROLLER HIT =====");
+
   try {
-    const { network, phone, planId } = req.body;
-    const plans = await subAndGain.getDataPlans(network);
-    const plan = plans.find(p => p.id === planId);
-    if (!plan) return res.status(400).json({ success: false, message: 'Invalid data plan' });
-    await vtpass.buyData({ network, phone, planId, amount: plan.price });
-    const wallet = await db.debitWallet(req.user.id, plan.price);
-    const ref = `DATA${Date.now()}`;
-    const txn = await db.createTransaction({
-      userId: req.user.id, type: 'debit', category: 'data',
-      title: `Data – ${network} ${plan.name}`, amount: plan.price,
-      status: 'successful', icon: 'wifi', reference: ref,
-      meta: { network, phone, plan },
+
+    const {
+      network,
+      phone,
+      dataPlan
+    } = req.body;
+
+    if (!network || !phone || !dataPlan) {
+      return res.status(400).json({
+        success: false,
+        message: "Network, phone and dataPlan are required"
+      });
+    }
+
+    // Check wallet
+    const wallet = await db.getWallet(req.user.id);
+
+    if (!wallet) {
+      return res.status(404).json({
+        success: false,
+        message: "Wallet not found"
+      });
+    }
+
+    // Buy from SubAndGain
+    const response = await subAndGain.buyData({
+      network,
+      phone,
+      dataPlan,
     });
-    res.json({ success: true, message: `${plan.name} data sent to ${phone}`, data: { wallet, transaction: txn, reference: ref } });
+
+    console.log("FULL SUBANDGAIN DATA RESPONSE");
+    console.log(response);
+
+    // Handle API errors
+    if (response.error || response.code) {
+      return res.status(400).json({
+        success: false,
+        message:
+          response.description ||
+          response.message ||
+          "Data purchase failed",
+        provider: response
+      });
+    }
+
+    // Success check
+    if (
+      response.status !== "Approved" &&
+      response.status !== "SUCCESS"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Data purchase failed",
+        provider: response
+      });
+    }
+
+    // Debit wallet using provider price if available
+    const amount = Number(
+      response.amount || 0
+    );
+
+    const updatedWallet = await db.debitWallet(
+      req.user.id,
+      amount
+    );
+
+    const reference = `DATA${Date.now()}`;
+
+    const txn = await db.createTransaction({
+      userId: req.user.id,
+      type: "debit",
+      category: "data",
+      title: `Data - ${response.network} ${response.dataPlan}`,
+      amount,
+      status: "successful",
+      icon: "wifi",
+      reference,
+      meta: {
+        network,
+        phone,
+        dataPlan,
+        providerReference: response.trans_id,
+        providerResponse: response,
+      },
+    });
+
+    return res.json({
+      success: true,
+      message: "Data purchased successfully",
+      data: {
+        wallet: updatedWallet,
+        transaction: txn,
+        provider: response,
+      }
+    });
+
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+
+    console.error(err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+
   }
 };
-
 // POST /api/services/electricity/verify
 exports.verifyMeter = async (req, res) => {
   try {
