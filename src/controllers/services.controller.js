@@ -1,5 +1,6 @@
 const db = require('../config/db');         // ← one ../
-const vtpass = require('../services/vtpass'); // ← one ../
+//const vtpass = require('../services/vtpass'); 
+const subAndGain = require('../services/subandgain.service');// ← one ../
 
 // GET /api/services/networks
 exports.getNetworks = (_req, res) => {
@@ -20,24 +21,104 @@ exports.getDiscos = (_req, res) => {
 
 // POST /api/services/airtime
 exports.buyAirtime = async (req, res) => {
-  try {
-    const { network, phone, amount } = req.body;
-    if (!network || !phone || !amount || amount < 50) {
-      return res.status(400).json({ success: false, message: 'Network, phone and amount (min ₦50) required' });
+   console.log("===== BUY AIRTIME CONTROLLER HIT =====");
+    try {
+
+        const { network, phone, amount } = req.body;
+
+        if (!network || !phone || !amount || Number(amount) < 50) {
+            return res.status(400).json({
+                success: false,
+                message: "Network, phone and amount (minimum ₦50) are required"
+            });
+        }
+
+        // Check wallet balance first
+        const currentWallet = await db.getWallet(req.user.id);
+
+        if (!currentWallet) {
+            return res.status(404).json({
+                success: false,
+                message: "Wallet not found"
+            });
+        }
+
+        if (currentWallet.balance < Number(amount)) {
+            return res.status(400).json({
+                success: false,
+                message: "Insufficient wallet balance"
+            });
+        }
+
+        // Call SubAndGain
+        const response = await subAndGain.buyAirtime({
+            network,
+            phone,
+            amount: Number(amount),
+        });
+
+        console.log("SubAndGain Response:", response);
+
+        // Only continue if provider approved
+        if (
+            response.status !== "Approved" &&
+            response.status !== "SUCCESS"
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: response.message || "Airtime purchase failed",
+                provider: response
+            });
+        }
+
+        // Debit wallet
+        const wallet = await db.debitWallet(
+            req.user.id,
+            Number(amount)
+        );
+
+        // Create our own reference
+        const reference = `AIR${Date.now()}`;
+
+        const txn = await db.createTransaction({
+            userId: req.user.id,
+            type: "debit",
+            category: "airtime",
+            title: `Airtime - ${network}`,
+            amount: Number(amount),
+            status: "successful",
+            icon: "phone_android",
+            reference,
+
+            meta: {
+                network,
+                phone,
+                providerReference:
+                    response.trans_id || null,
+                providerResponse: response,
+            },
+        });
+
+        return res.json({
+            success: true,
+            message: "Airtime purchased successfully",
+            data: {
+                wallet,
+                transaction: txn,
+                provider: response
+            }
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+
     }
-    await vtpass.buyAirtime({ network, phone, amount: parseFloat(amount) });
-    const wallet = await db.debitWallet(req.user.id, parseFloat(amount));
-    const ref = `AIR${Date.now()}`;
-    const txn = await db.createTransaction({
-      userId: req.user.id, type: 'debit', category: 'airtime',
-      title: `Airtime – ${network}`, amount: parseFloat(amount),
-      status: 'successful', icon: 'phone_android', reference: ref,
-      meta: { network, phone },
-    });
-    res.json({ success: true, message: `₦${Number(amount).toLocaleString()} airtime sent to ${phone}`, data: { wallet, transaction: txn, reference: ref } });
-  } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
-  }
 };
 
 // GET /api/services/data/plans
