@@ -174,13 +174,15 @@ async function getDataPlans(network) {
     }
     console.log(networkData.BUNDLE[0]);
 
-    return networkData.BUNDLE.map(plan => ({
-        id: String(plan.dataPlan),
-        name: plan.dataBundle,
-        price: Number(String(plan.price || "0").replace(/[₦,]/g, "")),
-        validity: plan.duration || "",
-        network: apiNetwork,
-    }));
+   return networkData.BUNDLE.map(plan => ({
+    id: plan.dataPlan,
+    name: plan.dataBundle,
+    validity: plan.duration,
+    network: apiNetwork,
+
+    // Price for API users
+    price: Number(plan.price?.[0]?.api_user ?? 0),
+}));
 
 }
 
