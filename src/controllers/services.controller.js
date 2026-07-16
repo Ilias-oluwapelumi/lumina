@@ -65,6 +65,9 @@ exports.buyAirtime = async (req, res) => {
             response.status !== "Approved" &&
             response.status !== "SUCCESS"
         ) {
+
+            console.log("FULL SUBANDGAIN RESPONSE");
+            console.log(response);
             return res.status(400).json({
                 success: false,
                 message: response.message || "Airtime purchase failed",
