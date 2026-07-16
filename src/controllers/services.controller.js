@@ -179,6 +179,10 @@ exports.buyData = async (req, res) => {
         message: "Wallet not found"
       });
     }
+    console.log("NETWORK =", network);
+console.log("DATAPLAN =", dataPlan);
+console.log("PHONE =", phone);
+
 
     // Buy from SubAndGain
     const response = await subAndGain.buyData({

@@ -120,6 +120,12 @@ async function buyData({
     phone,
 }) {
     try {
+        console.log("SENDING TO SUBANDGAIN");
+console.log({
+    network: network.toUpperCase(),
+    dataPlan,
+    phoneNumber: phone,
+});
 
         const response = await api.get("/data.php", {
             params: {
