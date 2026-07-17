@@ -348,6 +348,11 @@ async function payElectricity({
     if (!apiService) {
         throw new Error("Unsupported Disco");
     }
+    console.log({
+  service,
+  meterNumber,
+  meterType,
+});
 
     return request("/electricity.php", {
         service: apiService,
