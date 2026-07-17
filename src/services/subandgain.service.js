@@ -272,6 +272,9 @@ async function getCablePackages(service) {
 
     const bundles = await request("/cablebundles.php");
 
+    console.log("CABLE BUNDLES");
+console.log(JSON.stringify(bundles, null, 2));
+
     const provider = bundles.find(
         item => item.NETWORK === apiService
     );
