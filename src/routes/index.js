@@ -78,7 +78,7 @@ router.get(
 
 // Verify customer
 router.post(
-    '/cable/verify',
+    '/services/cable/verify',
     auth,
     servicesCtrl.verifyCable
 );
