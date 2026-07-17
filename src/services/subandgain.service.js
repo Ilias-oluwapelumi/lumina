@@ -187,7 +187,7 @@ async function getDataPlans(network) {
     network: apiNetwork,
 
     // Price for API users
-    price: Number(plan.price[0].api_user ),
+    price: Number(plan.price[0].api_user )+100,
 }));
 
 }
