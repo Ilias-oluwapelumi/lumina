@@ -269,6 +269,211 @@ console.log("PHONE =", phone);
 
   }
 };
+
+// GET /api/services/cable/packages
+exports.getCablePackages = async (req, res) => {
+  try {
+
+    const { service } = req.query;
+
+    const packages = await subAndGain.getCablePackages(service);
+
+    return res.json({
+      success: true,
+      data: {
+        service,
+        packages,
+      },
+    });
+
+  } catch (err) {
+
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+
+  }
+};
+
+// POST /api/services/cable/verify
+exports.verifyCable = async (req, res) => {
+
+  try {
+
+    const { service, smartNumber } = req.body;
+
+    if (!service || !smartNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Service and Smart Number are required",
+      });
+    }
+
+    const customer = await subAndGain.verifyCable({
+      service,
+      smartNumber,
+    });
+
+    return res.json({
+      success: true,
+      data: customer,
+    });
+
+  } catch (err) {
+
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+
+  }
+
+};
+
+// POST /api/services/cable
+exports.buyCable = async (req, res) => {
+
+    console.log("===== BUY CABLE CONTROLLER HIT =====");
+
+    try {
+
+        const {
+            service,
+            bills_code,
+            smartNumber,
+        } = req.body;
+
+        if (!service || !bills_code || !smartNumber) {
+            return res.status(400).json({
+                success: false,
+                message: "service, bills_code and smartNumber are required",
+            });
+        }
+
+        // Get wallet
+        const wallet = await db.getWallet(req.user.id);
+
+        if (!wallet) {
+            return res.status(404).json({
+                success: false,
+                message: "Wallet not found",
+            });
+        }
+
+        // Get packages from SubAndGain
+        const packages = await subAndGain.getCablePackages(service);
+
+        // Find selected package
+        const selectedPackage = packages.find(
+            p => p.code === bills_code
+        );
+
+        if (!selectedPackage) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid cable package",
+            });
+        }
+
+        // Correct amount from backend
+        const amount = selectedPackage.price;
+
+        // Check wallet balance
+        if (wallet.balance < amount) {
+            return res.status(400).json({
+                success: false,
+                message: "Insufficient wallet balance",
+            });
+        }
+
+        console.log("BUYING CABLE");
+        console.log({
+            service,
+            bills_code,
+            smartNumber,
+            amount,
+        });
+
+        // Purchase from provider
+        const response = await subAndGain.buyCable({
+            service,
+            bills_code,
+            smartNumber,
+        });
+
+        console.log("SUBANDGAIN RESPONSE");
+        console.log(response);
+
+        if (response.error) {
+            return res.status(400).json({
+                success: false,
+                message: response.description,
+                provider: response,
+            });
+        }
+
+        if (
+            response.status !== "Approved" &&
+            response.status !== "SUCCESS"
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Cable purchase failed",
+                provider: response,
+            });
+        }
+
+        // Debit wallet
+        const updatedWallet = await db.debitWallet(
+            req.user.id,
+            amount
+        );
+
+        const reference = `CABLE${Date.now()}`;
+
+        const txn = await db.createTransaction({
+            userId: req.user.id,
+            type: "debit",
+            category: "cable",
+            title: `${response.service} - ${response.package}`,
+            amount,
+            status: "successful",
+            icon: "tv",
+            reference,
+            meta: {
+                service,
+                bills_code,
+                smartNumber,
+                providerReference: response.trans_id,
+                providerResponse: response,
+            },
+        });
+
+        return res.json({
+            success: true,
+            message: "Cable subscription successful",
+            data: {
+                wallet: updatedWallet,
+                transaction: txn,
+                reference,
+                provider: response,
+            },
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+
+    }
+
+};
+
 // POST /api/services/electricity/verify
 exports.verifyMeter = async (req, res) => {
   try {

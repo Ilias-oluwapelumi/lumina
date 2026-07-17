@@ -192,9 +192,114 @@ async function getDataPlans(network) {
 
 }
 
+/*
+|--------------------------------------------------------------------------
+| CABLE TV
+|--------------------------------------------------------------------------
+*/
+
+const CABLE_SERVICES = {
+    DSTV: "DSTV",
+    Gotv: "GOTV",
+    GOTV: "GOTV",
+    Startimes: "STARTIMES",
+    STARTIMES: "STARTIMES",
+};
+
+/*
+|--------------------------------------------------------------------------
+| Verify Cable Customer
+|--------------------------------------------------------------------------
+*/
+
+async function verifyCable({
+    service,
+    smartNumber,
+}) {
+
+    const apiService = CABLE_SERVICES[service];
+
+    if (!apiService) {
+        throw new Error("Unsupported Cable Provider");
+    }
+
+    return request("/verify_bills.php", {
+        service: apiService,
+        smartNumber,
+    });
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| Buy Cable
+|--------------------------------------------------------------------------
+*/
+
+async function buyCable({
+    service,
+    bills_code,
+    smartNumber,
+}) {
+
+    const apiService = CABLE_SERVICES[service];
+
+    if (!apiService) {
+        throw new Error("Unsupported Cable Provider");
+    }
+
+    return request("/bills.php", {
+        service: apiService,
+        bills_code,
+        smartNumber,
+    });
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| Get Cable Packages
+|--------------------------------------------------------------------------
+*/
+
+async function getCablePackages(service) {
+
+    const apiService = CABLE_SERVICES[service];
+
+    if (!apiService) {
+        throw new Error("Unsupported Cable Provider");
+    }
+
+    const bundles = await request("/cablebundles.php");
+
+    const provider = bundles.find(
+        item => item.NETWORK === apiService
+    );
+
+    if (!provider) {
+        throw new Error("Cable Provider not found");
+    }
+    console.log(provider.BUNDLE[0]);
+
+    return provider.BUNDLE.map(plan => ({
+
+        code: plan.bills_code,
+        name: plan.plan,
+        price: Number(plan.price[0].api_user),
+        service: apiService,
+
+    }));
+
+}
+
 module.exports = {
     buyAirtime,
-    buyData,
     queryAirtime,
+
+    buyData,
     getDataPlans,
+
+    verifyCable,
+    buyCable,
+    getCablePackages,
 };

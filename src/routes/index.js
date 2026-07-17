@@ -66,6 +66,32 @@ router.post(
     servicesCtrl.buyData
 );
 
+// ===================== CABLE =====================
+// ===================== CABLE =====================
+
+// Get cable packages
+router.get(
+  '/services/cable/packages',
+  auth,
+  servicesCtrl.getCablePackages
+);
+
+// Verify customer
+router.post(
+  '/services/cable/verify',
+  auth,
+  verifyTransactionPin,
+  servicesCtrl.verifyCable
+);
+
+// Buy cable
+router.post(
+  '/services/cable',
+  auth,
+  verifyTransactionPin,
+  servicesCtrl.buyCable
+);
+
 
 router.get('/services/electricity/discos', auth, servicesCtrl.getDiscos);
 router.post('/services/electricity/verify', auth, servicesCtrl.verifyMeter);
@@ -77,15 +103,15 @@ router.post(
     servicesCtrl.payElectricity
 );
 
-router.get('/services/cable/plans', auth, servicesCtrl.getCablePlans);
-router.post('/services/cable/verify', auth, servicesCtrl.verifyCableCard);
+//router.get('/services/cable/plans', auth, servicesCtrl.getCablePlans);
+//router.post('/services/cable/verify', auth, servicesCtrl.verifyCableCard);
 //router.post('/services/cable/subscribe', auth, servicesCtrl.subscribeCable);
-router.post(
-    '/services/cable/subscribe',
-    auth,
-    verifyTransactionPin,
-    servicesCtrl.subscribeCable
-);
+//router.post(
+ //   '/services/cable/subscribe',
+  //  auth,
+  //  verifyTransactionPin,
+   // servicesCtrl.subscribeCable
+//);
 
 //router.post('/services/betting', auth, servicesCtrl.fundBetting);
 router.post(
