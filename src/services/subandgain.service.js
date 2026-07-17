@@ -411,6 +411,13 @@ async function queryEducation(trans_id) {
     });
 
 }
+async function buyEducation({ eduType }) {
+
+    return request("/education.php", {
+        eduType,
+    });
+
+}
 
 
 module.exports = {
