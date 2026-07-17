@@ -261,7 +261,6 @@ async function buyCable({
 | Get Cable Packages
 |--------------------------------------------------------------------------
 */
-
 async function getCablePackages(service) {
 
     const apiService = CABLE_SERVICES[service];
@@ -272,28 +271,25 @@ async function getCablePackages(service) {
 
     const bundles = await request("/cablebundles.php");
 
-    console.log("CABLE BUNDLES");
-console.log(JSON.stringify(bundles, null, 2));
-
     const provider = bundles.find(
-        item => item.NETWORK === apiService
+        item => item.SERVICE === apiService
     );
 
     if (!provider) {
         throw new Error("Cable Provider not found");
     }
-    console.log(provider.BUNDLE[0]);
 
-    return provider.BUNDLE.map(plan => ({
-
-        code: plan.bills_code,
-        name: plan.plan,
-        price: Number(plan.price[0].api_user),
-        service: apiService,
-
-    }));
-
+    return provider.BUNDLE
+        .filter(plan => plan.status === "Active")
+        .map(plan => ({
+            code: plan.billsCode,
+            name: plan.package,
+            price: Number(plan.price),
+            service: apiService,
+        }));
 }
+
+
 
 module.exports = {
     buyAirtime,
