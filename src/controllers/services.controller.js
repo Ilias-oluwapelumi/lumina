@@ -219,14 +219,10 @@ console.log("PHONE =", phone);
     }
 
     // Debit wallet using provider price if available
-    const amount = Number(
-      response.amount || 0
-    );
-
     const updatedWallet = await db.debitWallet(
-      req.user.id,
-      amount
-    );
+    req.user.id,
+   Number(amount),
+); 
 
     const reference = `DATA${Date.now()}`;
 
