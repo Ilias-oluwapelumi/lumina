@@ -1,4 +1,5 @@
 const axios = require("axios");
+const pricing = require("../config/pricing");
 
 const api = axios.create({
     baseURL: process.env.SUBANDGAIN_BASE_URL,
@@ -180,16 +181,17 @@ async function getDataPlans(network) {
     }
     console.log(networkData.BUNDLE[0]);
 
-   return networkData.BUNDLE.map(plan => ({
+   const PROFIT = 100;
+
+return networkData.BUNDLE.map(plan => ({
     id: plan.dataPlan,
     name: plan.dataBundle,
     validity: plan.duration,
     network: apiNetwork,
+    price: Number(plan.price[0].api_user) + pricing.data,
 
-    // Price for API users
-    price: Number(plan.price[0].api_user )+200,
+   
 }));
-
 }
 
 /*

@@ -2,6 +2,7 @@ const db = require('../config/db');         // ← one ../
 //const vtpass = require('../services/vtpass'); 
 const subAndGain = require('../services/subandgain.service');
 console.log(subAndGain);// ← one ../
+const pricing = require('../config/pricing');
 
 // GET /api/services/networks
 exports.getNetworks = (_req, res) => {
@@ -19,10 +20,11 @@ exports.getDiscos = (_req, res) => {
   });
 };
 
-
 // POST /api/services/airtime
 exports.buyAirtime = async (req, res) => {
+
   console.log("===== BUY AIRTIME CONTROLLER HIT =====");
+
   try {
 
     const { network, phone, amount } = req.body;
@@ -30,75 +32,92 @@ exports.buyAirtime = async (req, res) => {
     if (!network || !phone || !amount || Number(amount) < 50) {
       return res.status(400).json({
         success: false,
-        message: "Network, phone and amount (minimum ₦50) are required"
+        message: "Network, phone and amount (minimum ₦50) are required",
       });
     }
 
-    // Check wallet balance first
+    // Provider amount
+    const providerAmount = Number(amount);
+
+    // Customer amount (includes your profit)
+    const amountToCharge = providerAmount + pricing.airtime;
+
+    // Check wallet
     const currentWallet = await db.getWallet(req.user.id);
 
     if (!currentWallet) {
       return res.status(404).json({
         success: false,
-        message: "Wallet not found"
+        message: "Wallet not found",
       });
     }
 
-    if (currentWallet.balance < Number(amount)) {
+    if (currentWallet.balance < amountToCharge) {
       return res.status(400).json({
         success: false,
-        message: "Insufficient wallet balance"
+        message: "Insufficient wallet balance",
       });
     }
 
-    // Call SubAndGain
+    // Buy from SubAndGain using ORIGINAL amount
     const response = await subAndGain.buyAirtime({
       network,
       phone,
-      amount: Number(amount),
+      amount: providerAmount,
     });
 
-    console.log("SubAndGain Response:", response);
+    console.log("SubAndGain Response:");
+    console.log(response);
 
-    // Only continue if provider approved
+    // Provider returned an error
+    if (response.error || response.code) {
+      return res.status(400).json({
+        success: false,
+        message:
+          response.description ||
+          response.message ||
+          "Airtime purchase failed",
+        provider: response,
+      });
+    }
+
+    // Provider didn't approve
     if (
       response.status !== "Approved" &&
       response.status !== "SUCCESS"
     ) {
-
-      console.log("FULL SUBANDGAIN RESPONSE");
-      console.log(response);
       return res.status(400).json({
         success: false,
-        message: response.message || "Airtime purchase failed",
-        provider: response
+        message: "Airtime purchase failed",
+        provider: response,
       });
     }
 
-    // Debit wallet
+    // Debit customer's wallet
     const wallet = await db.debitWallet(
       req.user.id,
-      Number(amount)
+      amountToCharge
     );
 
-    // Create our own reference
     const reference = `AIR${Date.now()}`;
 
+    // Save transaction
     const txn = await db.createTransaction({
       userId: req.user.id,
       type: "debit",
       category: "airtime",
       title: `Airtime - ${network}`,
-      amount: Number(amount),
+      amount: amountToCharge,
       status: "successful",
       icon: "phone_android",
       reference,
-
       meta: {
         network,
         phone,
-        providerReference:
-          response.trans_id || null,
+        providerAmount,
+        chargedAmount: amountToCharge,
+        profit: pricing.airtime,
+        providerReference: response.trans_id,
         providerResponse: response,
       },
     });
@@ -109,8 +128,9 @@ exports.buyAirtime = async (req, res) => {
       data: {
         wallet,
         transaction: txn,
-        provider: response
-      }
+        reference,
+        provider: response,
+      },
     });
 
   } catch (err) {
@@ -119,10 +139,11 @@ exports.buyAirtime = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: err.message
+      message: err.message,
     });
 
   }
+
 };
 
 // GET /api/services/data/plans
@@ -218,20 +239,26 @@ console.log("PHONE =", phone);
       });
     }
 
-    // Debit wallet using provider price if available
-    const updatedWallet = await db.debitWallet(
+   // Provider price
+const providerAmount = Number(response.amount || 0);
+
+// Add your profit
+const amountToCharge = providerAmount + pricing.data;
+
+// Debit customer's wallet
+const updatedWallet = await db.debitWallet(
     req.user.id,
-   Number(amount),
-); 
+    amountToCharge
+);
 
-    const reference = `DATA${Date.now()}`;
+const reference = `DATA${Date.now()}`;
 
-    const txn = await db.createTransaction({
-      userId: req.user.id,
-      type: "debit",
-      category: "data",
-      title: `Data - ${response.network} ${response.dataPlan}`,
-      amount,
+const txn = await db.createTransaction({
+  userId: req.user.id,
+  type: "debit",
+  category: "data",
+  title: `Data - ${response.network} ${response.dataPlan}`,
+  amount: amountToCharge  ,
       status: "successful",
       icon: "wifi",
       reference,
@@ -347,7 +374,7 @@ exports.buyCable = async (req, res) => {
             });
         }
 
-        // Get wallet
+        // Get user's wallet
         const wallet = await db.getWallet(req.user.id);
 
         if (!wallet) {
@@ -372,11 +399,14 @@ exports.buyCable = async (req, res) => {
             });
         }
 
-        // Correct amount from backend
-        const amount = selectedPackage.price;
+        // Provider price
+        const providerAmount = Number(selectedPackage.price);
+
+        // YOUR SELLING PRICE (+₦100 profit)
+        const amountToCharge = providerAmount + 100;
 
         // Check wallet balance
-        if (wallet.balance < amount) {
+        if (wallet.balance < amountToCharge) {
             return res.status(400).json({
                 success: false,
                 message: "Insufficient wallet balance",
@@ -388,10 +418,11 @@ exports.buyCable = async (req, res) => {
             service,
             bills_code,
             smartNumber,
-            amount,
+            providerAmount,
+            amountToCharge,
         });
 
-        // Purchase from provider
+        // Purchase from SubAndGain
         const response = await subAndGain.buyCable({
             service,
             bills_code,
@@ -420,10 +451,10 @@ exports.buyCable = async (req, res) => {
             });
         }
 
-        // Debit wallet
+        // Debit wallet using YOUR selling price
         const updatedWallet = await db.debitWallet(
             req.user.id,
-            amount
+            amountToCharge
         );
 
         const reference = `CABLE${Date.now()}`;
@@ -433,7 +464,7 @@ exports.buyCable = async (req, res) => {
             type: "debit",
             category: "cable",
             title: `${response.service} - ${response.package}`,
-            amount,
+            amount: amountToCharge,
             status: "successful",
             icon: "tv",
             reference,
@@ -441,6 +472,8 @@ exports.buyCable = async (req, res) => {
                 service,
                 bills_code,
                 smartNumber,
+                providerAmount,
+                profit: 100,
                 providerReference: response.trans_id,
                 providerResponse: response,
             },
