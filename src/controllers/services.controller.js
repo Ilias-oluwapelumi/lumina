@@ -40,7 +40,7 @@ exports.buyAirtime = async (req, res) => {
     const providerAmount = Number(amount);
 
     // Customer amount (includes your profit)
-    const amountToCharge = providerAmount + pricing.airtime;
+   const amountToCharge = Number(amount) + profit.airtime;
 
     // Check wallet
     const currentWallet = await db.getWallet(req.user.id);
@@ -243,7 +243,7 @@ console.log("PHONE =", phone);
 const providerAmount = Number(response.amount || 0);
 
 // Add your profit
-const amountToCharge = providerAmount + pricing.data;
+const amountToCharge = providerPrice + profit.data;
 
 // Debit customer's wallet
 const updatedWallet = await db.debitWallet(
@@ -403,7 +403,7 @@ exports.buyCable = async (req, res) => {
         const providerAmount = Number(selectedPackage.price);
 
         // YOUR SELLING PRICE (+₦100 profit)
-        const amountToCharge = providerAmount + 100;
+        const amountToCharge = providerPrice + profit.cable;
 
         // Check wallet balance
         if (wallet.balance < amountToCharge) {

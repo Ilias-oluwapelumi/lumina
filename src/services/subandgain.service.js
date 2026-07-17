@@ -125,6 +125,7 @@ async function buyData({
 console.log({
     network: network.toUpperCase(),
     dataPlan,
+    
     phoneNumber: phone,
 });
 
