@@ -295,6 +295,88 @@ async function getCablePackages(service) {
         }));
 }
 
+/*
+|--------------------------------------------------------------------------
+| ELECTRICITY
+|--------------------------------------------------------------------------
+*/
+
+const DISCOS = {
+    IKEDC: "IKEDC",
+    EKEDC: "EKEDC",
+    AEDC: "AEDC",
+    KEDC: "KEDC",
+    JEDC: "JEDC",
+    IBEDC: "IBEDC",
+    KAEDC: "KAEDC",
+    EEDC: "EEDC",
+    PhED: "PhED",
+    BEDC: "BEDC",
+    ABA: "ABA",
+    YEDC: "YEDC",
+};
+
+async function verifyElectricity({
+    service,
+    meterNumber,
+    meterType,
+}) {
+
+    const apiService = DISCOS[service];
+
+    if (!apiService) {
+        throw new Error("Unsupported Disco");
+    }
+
+    return request("/verify_electricity.php", {
+        service: apiService,
+        meterNumber,
+        meterType,
+    });
+
+}
+async function payElectricity({
+    service,
+    meterNumber,
+    meterType,
+    accessToken,
+    amount,
+}) {
+
+    const apiService = DISCOS[service];
+
+    if (!apiService) {
+        throw new Error("Unsupported Disco");
+    }
+
+    return request("/electricity.php", {
+        service: apiService,
+        meterNumber,
+        meterType,
+        accessToken,
+        amount,
+    });
+
+}
+
+async function getDiscos() {
+
+    return [
+        { code: "IKEDC", name: "Ikeja Electric" },
+        { code: "EKEDC", name: "Eko Electric" },
+        { code: "AEDC", name: "Abuja Electric" },
+        { code: "KEDC", name: "Kano Electric" },
+        { code: "JEDC", name: "Jos Electric" },
+        { code: "IBEDC", name: "Ibadan Electric" },
+        { code: "KAEDC", name: "Kaduna Electric" },
+        { code: "EEDC", name: "Enugu Electric" },
+        { code: "PhED", name: "Port Harcourt Electric" },
+        { code: "BEDC", name: "Benin Electric" },
+        { code: "ABA", name: "Aba Power" },
+        { code: "YEDC", name: "Yola Electric" },
+    ];
+
+}
 
 
 module.exports = {
@@ -307,4 +389,8 @@ module.exports = {
     verifyCable,
     buyCable,
     getCablePackages,
+
+    verifyElectricity,
+    payElectricity,
+    getDiscos,
 };

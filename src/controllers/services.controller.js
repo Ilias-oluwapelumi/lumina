@@ -506,35 +506,188 @@ exports.buyCable = async (req, res) => {
 // POST /api/services/electricity/verify
 exports.verifyMeter = async (req, res) => {
   try {
-    const { meterNumber, disco, meterType } = req.body;
-    if (!meterNumber || !disco) return res.status(400).json({ success: false, message: 'Meter number and DISCO required' });
-    const result = await vtpass.verifyMeter({ meterNumber, disco, meterType });
-    res.json({ success: true, data: result });
+
+    const {
+      disco,
+      meterNumber,
+      meterType,
+    } = req.body;
+
+    if (!disco || !meterNumber || !meterType) {
+      return res.status(400).json({
+        success: false,
+        message: "Disco, meter number and meter type are required",
+      });
+    }
+
+    const customer = await subAndGain.verifyElectricity({
+      service: disco,
+      meterNumber,
+      meterType,
+    });
+
+    return res.json({
+      success: true,
+      data: customer,
+    });
+
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+
   }
 };
 
-// POST /api/services/electricity/pay
+/// POST /api/services/electricity/pay
 exports.payElectricity = async (req, res) => {
+
+  console.log("===== PAY ELECTRICITY CONTROLLER HIT =====");
+
   try {
-    const { meterNumber, disco, meterType, amount, phone } = req.body;
-    if (!meterNumber || !disco || !amount || amount < 500) {
-      return res.status(400).json({ success: false, message: 'All fields required. Minimum ₦500' });
+
+    const {
+      disco,
+      meterNumber,
+      meterType,
+      accessToken,
+      amount,
+    } = req.body;
+
+    if (
+      !disco ||
+      !meterNumber ||
+      !meterType ||
+      !accessToken ||
+      !amount
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
     }
-    const result = await vtpass.payElectricity({ meterNumber, disco, meterType, amount: parseFloat(amount), phone: phone || req.user.phone });
-    const wallet = await db.debitWallet(req.user.id, parseFloat(amount));
-    const ref = `ELEC${Date.now()}`;
-    const txn = await db.createTransaction({
-      userId: req.user.id, type: 'debit', category: 'electricity',
-      title: `${disco} – ${meterType}`, amount: parseFloat(amount),
-      status: 'successful', icon: 'bolt', reference: ref,
-      meta: { meterNumber, disco, meterType, token: result.token },
+
+    const providerAmount = Number(amount);
+
+    if (providerAmount < 1000) {
+      return res.status(400).json({
+        success: false,
+        message: "Minimum amount is ₦1000",
+      });
+    }
+
+    // Your profit
+    const amountToCharge = providerAmount + 100;
+
+    // Wallet
+    const wallet = await db.getWallet(req.user.id);
+
+    if (!wallet) {
+      return res.status(404).json({
+        success: false,
+        message: "Wallet not found",
+      });
+    }
+
+    if (wallet.balance < amountToCharge) {
+      return res.status(400).json({
+        success: false,
+        message: "Insufficient wallet balance",
+      });
+    }
+
+    console.log({
+      disco,
+      meterNumber,
+      meterType,
+      accessToken,
+      providerAmount,
+      amountToCharge,
     });
-    res.json({ success: true, message: `Token: ${result.token}. ₦${Number(amount).toLocaleString()} paid to ${disco}`, data: { wallet, transaction: txn, token: result.token, reference: ref } });
+
+    // Buy from SubAndGain
+    const response = await subAndGain.payElectricity({
+      service: disco,
+      meterNumber,
+      meterType,
+      accessToken,
+      amount: providerAmount,
+    });
+
+    console.log(response);
+
+    if (response.error) {
+      return res.status(400).json({
+        success: false,
+        message: response.description,
+        provider: response,
+      });
+    }
+
+    if (
+      response.status !== "Approved" &&
+      response.status !== "SUCCESS"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Electricity purchase failed",
+        provider: response,
+      });
+    }
+
+    // Debit wallet
+    const updatedWallet = await db.debitWallet(
+      req.user.id,
+      amountToCharge
+    );
+
+    const reference = `ELEC${Date.now()}`;
+
+    const txn = await db.createTransaction({
+      userId: req.user.id,
+      type: "debit",
+      category: "electricity",
+      title: response.service,
+      amount: amountToCharge,
+      status: "successful",
+      icon: "bolt",
+      reference,
+      meta: {
+        disco,
+        meterNumber,
+        meterType,
+        accessToken,
+        providerReference: response.trans_id,
+        meterToken: response.MeterToken,
+        providerResponse: response,
+      },
+    });
+
+    return res.json({
+      success: true,
+      message: "Electricity purchase successful",
+      data: {
+        wallet: updatedWallet,
+        transaction: txn,
+        token: response.MeterToken,
+        reference,
+        provider: response,
+      },
+    });
+
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+
+    console.error(err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+
   }
+
 };
 
 // GET /api/services/cable/plans
