@@ -78,11 +78,11 @@ router.get(
 
 // Verify customer
 router.post(
-  '/services/cable/verify',
-  auth,
-  verifyTransactionPin,
-  servicesCtrl.verifyCable
+    '/cable/verify',
+    auth,
+    servicesCtrl.verifyCable
 );
+
 
 // Buy cable
 router.post(

@@ -200,10 +200,13 @@ async function getDataPlans(network) {
 
 const CABLE_SERVICES = {
     DSTV: "DSTV",
-    Gotv: "GOTV",
+    GOtv: "GOTV",
     GOTV: "GOTV",
-    Startimes: "STARTIMES",
+    Gotv: "GOTV",
+
+    StarTimes: "STARTIMES",
     STARTIMES: "STARTIMES",
+    Startimes: "STARTIMES",
 };
 
 /*
