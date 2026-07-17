@@ -121,12 +121,22 @@ router.post(
     servicesCtrl.fundBetting
 );
 
-//router.post('/services/education', auth, servicesCtrl.purchaseEducation);
+router.get(
+    '/services/education/products',
+    auth,
+    servicesCtrl.getEducationProducts
+);
+
 router.post(
     '/services/education',
     auth,
     verifyTransactionPin,
     servicesCtrl.purchaseEducation
+);
+router.get(
+    "/services/education/products",
+    auth,
+    servicesCtrl.getEducationProducts,
 );
 
 

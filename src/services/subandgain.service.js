@@ -382,6 +382,35 @@ async function getDiscos() {
     ];
 
 }
+async function getEducationProducts() {
+
+    const products = await request("/edu_prices.php");
+
+    return products.map(item => ({
+        code: item.eduType,
+        name: item.package,
+        price: Number(item.price),
+    }));
+
+}
+async function getEducationProducts() {
+
+    const products = await request("/edu_prices.php");
+
+    return products.map(item => ({
+        code: item.eduType,
+        name: item.package,
+        price: Number(item.price),
+    }));
+
+}
+async function queryEducation(trans_id) {
+
+    return request("/query_education.php", {
+        trans_id,
+    });
+
+}
 
 
 module.exports = {
@@ -395,7 +424,11 @@ module.exports = {
     buyCable,
     getCablePackages,
 
+    getDiscos,
     verifyElectricity,
     payElectricity,
-    getDiscos,
+
+    getEducationProducts,
+    buyEducation,
+    queryEducation,
 };

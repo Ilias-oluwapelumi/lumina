@@ -750,44 +750,155 @@ exports.fundBetting = async (req, res) => {
 
 // POST /api/services/education
 exports.purchaseEducation = async (req, res) => {
-  try {
-    const { service, type, quantity, amount } = req.body;
-    if (!service || !type || !quantity || !amount) {
-      return res.status(400).json({
-        success: false,
-        message: 'All fields are required'
-      });
+
+    console.log("===== BUY EDUCATION CONTROLLER HIT =====");
+
+    try {
+
+        const { eduType } = req.body;
+
+        if (!eduType) {
+            return res.status(400).json({
+                success: false,
+                message: "Education type is required",
+            });
+        }
+
+        // Get user's wallet
+        const wallet = await db.getWallet(req.user.id);
+
+        if (!wallet) {
+            return res.status(404).json({
+                success: false,
+                message: "Wallet not found",
+            });
+        }
+
+        // Get available education products
+        const products = await subAndGain.getEducationProducts();
+
+        const product = products.find(
+            p => p.code === eduType
+        );
+
+        if (!product) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid education product",
+            });
+        }
+
+        // Provider price
+        const providerPrice = Number(product.price);
+
+        // Add your profit
+        const amountToCharge = providerPrice + 100;
+
+        // Check wallet balance
+        if (wallet.balance < amountToCharge) {
+            return res.status(400).json({
+                success: false,
+                message: "Insufficient wallet balance",
+            });
+        }
+
+        // Buy from SubAndGain
+        const response = await subAndGain.buyEducation({
+            eduType,
+        });
+
+        console.log(response);
+
+        if (
+            response.status !== "Approved" &&
+            response.status !== "SUCCESS"
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Education purchase failed",
+                provider: response,
+            });
+        }
+
+        // Debit wallet
+        const updatedWallet = await db.debitWallet(
+            req.user.id,
+            amountToCharge
+        );
+
+        const reference = `EDU${Date.now()}`;
+
+        // Save transaction
+        const txn = await db.createTransaction({
+            userId: req.user.id,
+            type: "debit",
+            category: "education",
+            title: product.name,
+            amount: amountToCharge,
+            status: "successful",
+            icon: "school",
+            reference,
+            meta: {
+                eduType,
+                providerReference: response.trans_id,
+                token: response.token,
+                providerResponse: response,
+            },
+        });
+
+        return res.json({
+            success: true,
+            message: "Education PIN purchased successfully",
+            data: {
+                wallet: updatedWallet,
+                transaction: txn,
+                reference,
+                token: response.token,
+                provider: response,
+            },
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+
     }
-    const wallet = await db.debitWallet(req.user.id, parseFloat(amount));
-    const ref = `EDU${Date.now()}`;
 
-    // Generate pins
-    const pins = Array.from({ length: quantity }, () => ({
-      pin: Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString(),
-      serial: Math.floor(100000000000 + Math.random() * 900000000000).toString(),
-    }));
-
-    const txn = await db.createTransaction({
-      userId: req.user.id,
-      type: 'debit',
-      category: 'education',
-      title: `${service} ${type} x${quantity}`,
-      amount: parseFloat(amount),
-      status: 'successful',
-      icon: 'school',
-      reference: ref,
-      meta: { service, type, quantity, pins },
-    });
-    res.json({
-      success: true,
-      message: `${quantity} ${service} ${type} pin${quantity > 1 ? 's' : ''} purchased successfully`,
-      data: { wallet, transaction: txn, reference: ref, pins },
-    });
-  } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
-  }
 };
+// GET /api/services/education/products
+exports.getEducationProducts = async (req, res) => {
+    try {
 
+        const products = await subAndGain.getEducationProducts();
+
+        const formatted = products.map(item => ({
+            code: item.code,
+            name: item.name,
+            price: Number(item.price) + 100, // your profit
+            providerPrice: Number(item.price),
+        }));
+
+        return res.json({
+            success: true,
+            data: formatted,
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+
+    }
+};
 
 // POST /api/services/cable/subscribe
 exports.subscribeCable = async (req, res) => {
@@ -808,5 +919,4 @@ exports.subscribeCable = async (req, res) => {
     res.json({ success: true, message: `${provider} ${plan.name} subscription renewed!`, data: { wallet, transaction: txn, reference: ref } });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
-  }
-};
+  }};
