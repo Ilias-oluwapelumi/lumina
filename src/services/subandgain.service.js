@@ -452,6 +452,15 @@ async function getEducationProducts() {
         price: Number(item.price) + pricing.education,
     }));
 }
+async function getEducationProducts() {
+
+    const products = await request("/edu_prices.php");
+
+    console.log("EDUCATION PRODUCTS");
+    console.log(JSON.stringify(products, null, 2));
+
+    return [];
+}
 
 async function buyEducation({ eduType }) {
 
@@ -468,6 +477,7 @@ async function queryEducation(trans_id) {
     });
 
 }
+
 
 /*
 |--------------------------------------------------------------------------
