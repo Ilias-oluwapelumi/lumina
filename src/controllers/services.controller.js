@@ -174,123 +174,152 @@ exports.getDataPlans = async (req, res) => {
 
 // POST /api/services/data
 exports.buyData = async (req, res) => {
-  console.log("===== BUY DATA CONTROLLER HIT =====");
+    console.log("===== BUY DATA CONTROLLER HIT =====");
 
-  try {
+    try {
 
-    const {
-      network,
-      phone,
-      dataPlan
-    } = req.body;
+        const {
+            network,
+            phone,
+            dataPlan,
+        } = req.body;
 
-    if (!network || !phone || !dataPlan) {
-      return res.status(400).json({
-        success: false,
-        message: "Network, phone and dataPlan are required"
-      });
+        if (!network || !phone || !dataPlan) {
+            return res.status(400).json({
+                success: false,
+                message: "Network, phone and dataPlan are required",
+            });
+        }
+
+        // User wallet
+        const wallet = await db.getWallet(req.user.id);
+
+        if (!wallet) {
+            return res.status(404).json({
+                success: false,
+                message: "Wallet not found",
+            });
+        }
+
+        //---------------------------------------------------
+        // GET YOUR PRICE FROM DATABASE
+        //---------------------------------------------------
+
+        const priceRow = await db.getProductPrice({
+            category: "data",
+            provider: network,
+            productCode: dataPlan,
+        });
+
+        if (!priceRow) {
+            return res.status(400).json({
+                success: false,
+                message: "Data plan price not configured.",
+            });
+        }
+
+        const amountToCharge = Number(priceRow.selling_price);
+
+        //---------------------------------------------------
+        // CHECK BALANCE
+        //---------------------------------------------------
+
+        if (wallet.balance < amountToCharge) {
+            return res.status(400).json({
+                success: false,
+                message: "Insufficient wallet balance",
+            });
+        }
+
+        console.log("NETWORK =", network);
+        console.log("PLAN =", dataPlan);
+        console.log("PHONE =", phone);
+        console.log("SELLING PRICE =", amountToCharge);
+
+        //---------------------------------------------------
+        // BUY FROM SUBANDGAIN
+        //---------------------------------------------------
+
+        const response = await subAndGain.buyData({
+            network,
+            phone,
+            dataPlan,
+        });
+
+        console.log(response);
+
+        if (response.error || response.code) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    response.description ||
+                    response.message ||
+                    "Data purchase failed",
+                provider: response,
+            });
+        }
+
+        if (
+            response.status !== "Approved" &&
+            response.status !== "SUCCESS"
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Data purchase failed",
+                provider: response,
+            });
+        }
+
+        //---------------------------------------------------
+        // DEBIT WALLET
+        //---------------------------------------------------
+
+        const updatedWallet = await db.debitWallet(
+            req.user.id,
+            amountToCharge
+        );
+
+        const reference = `DATA${Date.now()}`;
+
+        const txn = await db.createTransaction({
+            userId: req.user.id,
+            type: "debit",
+            category: "data",
+            title: `${response.network} ${response.dataPlan}`,
+            amount: amountToCharge,
+            status: "successful",
+            icon: "wifi",
+            reference,
+            meta: {
+                network,
+                phone,
+                dataPlan,
+                providerReference: response.trans_id,
+                providerResponse: response,
+            },
+        });
+
+        return res.json({
+            success: true,
+            message: "Data purchased successfully",
+            data: {
+                wallet: updatedWallet,
+                transaction: txn,
+                reference,
+                provider: response,
+            },
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+
     }
-
-    // Check wallet
-    const wallet = await db.getWallet(req.user.id);
-
-    if (!wallet) {
-      return res.status(404).json({
-        success: false,
-        message: "Wallet not found"
-      });
-    }
-    console.log("NETWORK =", network);
-console.log("DATAPLAN =", dataPlan);
-console.log("PHONE =", phone);
-
-
-    // Buy from SubAndGain
-    const response = await subAndGain.buyData({
-      network,
-      phone,
-      dataPlan,
-    });
-
-    console.log("FULL SUBANDGAIN DATA RESPONSE");
-    console.log(response);
-
-    // Handle API errors
-    if (response.error || response.code) {
-      return res.status(400).json({
-        success: false,
-        message:
-          response.description ||
-          response.message ||
-          "Data purchase failed",
-        provider: response
-      });
-    }
-
-    // Success check
-    if (
-      response.status !== "Approved" &&
-      response.status !== "SUCCESS"
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Data purchase failed",
-        provider: response
-      });
-    }
-
-   // Provider price
-const providerAmount = Number(response.amount || 0);
-
-// Add your profit
-const amountToCharge = providerPrice + profit.data;
-
-// Debit customer's wallet
-const updatedWallet = await db.debitWallet(
-    req.user.id,
-    amountToCharge
-);
-
-const reference = `DATA${Date.now()}`;
-
-const txn = await db.createTransaction({
-  userId: req.user.id,
-  type: "debit",
-  category: "data",
-  title: `Data - ${response.network} ${response.dataPlan}`,
-  amount: amountToCharge  ,
-      status: "successful",
-      icon: "wifi",
-      reference,
-      meta: {
-        network,
-        phone,
-        dataPlan,
-        providerReference: response.trans_id,
-        providerResponse: response,
-      },
-    });
-
-    return res.json({
-      success: true,
-      message: "Data purchased successfully",
-      data: {
-        wallet: updatedWallet,
-        transaction: txn,
-        provider: response,
-      }
-    });
-
-  } catch (err) {
-
-    console.error(err);
-
-    return res.status(500).json({
-      success: false,
-      message: err.message
-    });
-
-  }
 };
 
 // GET /api/services/cable/packages

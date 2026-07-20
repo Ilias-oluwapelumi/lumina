@@ -103,6 +103,8 @@ exports.setPin = async (req, res) => {
                 message: 'PIN must be exactly 4 digits'
             });
         }
+        console.log("req.user.id =", req.user.id);
+console.log("req.user._id =", req.user._id);
 
         const pinData = await db.getTransactionPin(req.user);
 

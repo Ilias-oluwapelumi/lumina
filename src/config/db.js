@@ -57,6 +57,35 @@ const transactionSchema = new mongoose.Schema({
   meta:      { type: mongoose.Schema.Types.Mixed },
 });
 
+const productPriceSchema = new mongoose.Schema({
+  category: {
+    type: String,
+    required: true,
+  },
+
+  provider: {
+    type: String,
+    required: true,
+  },
+
+  productCode: {
+    type: String,
+    required: true,
+  },
+
+  productName: String,
+
+  buyingPrice: {
+    type: Number,
+    default: 0,
+  },
+
+  sellingPrice: {
+    type: Number,
+    required: true,
+  },
+});
+
 const refreshTokenSchema = new mongoose.Schema({
   token: { type: String, required: true, unique: true },
 });
@@ -66,6 +95,9 @@ const Wallet       = mongoose.models.Wallet       || mongoose.model('Wallet', wa
 const Transaction  = mongoose.models.Transaction  || mongoose.model('Transaction', transactionSchema);
 const RefreshToken = mongoose.models.RefreshToken || mongoose.model('RefreshToken', refreshTokenSchema);
 
+const ProductPrice =
+    mongoose.models.ProductPrice ||
+    mongoose.model("ProductPrice", productPriceSchema);
 // ─── SEED DEMO USER ──────────────────────────────────────────────────────────
 async function seed() {
   const exists = await User.findOne({ phone: '08012345678' });
@@ -166,22 +198,27 @@ const db = {
     return user;
   },
 
-  setTransactionPin: async (id, pinHash) => {
+ setTransactionPin: async (id, pinHash) => {
     const filter = getFilter(id);
 
-    console.log("FILTER =".filter);
-    const result = await User.updateOne(filter, { 
-      $set: { 
-        transactionPin: pinHash,
-        pinAttempts: 0,
-        pinLockedUntil: null
-      } 
-    });
-    if (!result.matchedCount) throw new Error('User not found');
-    const fresh = await User.findOne(filter, { transactionPin: 1 }).lean();
-    return fresh;
-  },
+    console.log("FILTER =", filter);
 
+    const user = await User.findOne(filter);
+
+    console.log("FOUND USER =", user);
+
+    if (!user) {
+        throw new Error("User not found");
+    }
+
+    user.transactionPin = pinHash;
+    user.pinAttempts = 0;
+    user.pinLockedUntil = null;
+
+    await user.save();
+
+    return user.toObject();
+},
   changeTransactionPin: async (id, pinHash) => {
     const filter = getFilter(id);
     const result = await User.updateOne(filter, {
@@ -260,6 +297,67 @@ const db = {
 
   getTransactionById:        (id)        => Transaction.findOne({ id }).lean(),
   getTransactionByReference: (reference) => Transaction.findOne({ reference }).lean(),
+
+  // ===============================
+// PRODUCT PRICES
+// ===============================
+
+getProductPrice: async ({
+    category,
+    provider,
+    productCode,
+}) => {
+
+    return await ProductPrice.findOne({
+        category,
+        provider,
+        productCode,
+    }).lean();
+
+},
+
+getAllProductPrices: async (category) => {
+
+    return await ProductPrice.find({
+        category,
+    }).lean();
+
+},
+
+updateProductPrice: async ({
+    category,
+    provider,
+    productCode,
+    productName,
+    buyingPrice,
+    sellingPrice,
+}) => {
+
+    return await ProductPrice.findOneAndUpdate(
+
+        {
+            category,
+            provider,
+            productCode,
+        },
+
+        {
+            category,
+            provider,
+            productCode,
+            productName,
+            buyingPrice,
+            sellingPrice,
+        },
+
+        {
+            upsert: true,
+            new: true,
+        }
+
+    ).lean();
+
+},
 
   // Token Store Operations
   storeRefreshToken:  (token) => RefreshToken.create({ token }),
