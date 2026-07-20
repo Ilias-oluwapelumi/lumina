@@ -24,11 +24,12 @@ const NETWORKS = {
 
 /*
 |--------------------------------------------------------------------------
-| Generic Request Function
+| Generic GET Request
 |--------------------------------------------------------------------------
 */
 
 async function request(endpoint, params = {}) {
+
     try {
 
         console.log("==================================");
@@ -50,9 +51,12 @@ async function request(endpoint, params = {}) {
         console.log(data);
         console.log("==================================");
 
-        // Provider returned an error
         if (data.error) {
-            throw new Error(data.description || data.error);
+            throw new Error(
+                data.description ||
+                data.error ||
+                "SubAndGain Error"
+            );
         }
 
         return data;
@@ -69,8 +73,9 @@ async function request(endpoint, params = {}) {
 
         }
 
-        throw err;
+        throw new Error(err.message);
     }
+
 }
 
 /*
@@ -111,7 +116,12 @@ async function queryAirtime(trans_id) {
         trans_id,
     });
 
-}
+}/*
+|--------------------------------------------------------------------------
+| DATA
+|--------------------------------------------------------------------------
+*/
+
 /**
  * Buy Data
  */
@@ -120,47 +130,47 @@ async function buyData({
     dataPlan,
     phone,
 }) {
-    try {
-        console.log("SENDING TO SUBANDGAIN");
-console.log({
-    network: network.toUpperCase(),
-    dataPlan,
-    
-    phoneNumber: phone,
-});
 
-        const response = await api.get("/data.php", {
-            params: {
-                username,
-                apiKey,
-                network: network.toUpperCase(),
-                dataPlan,
-                phoneNumber: phone,
-            },
-        });
+    const apiNetwork = NETWORKS[network];
 
-        console.log("FULL SUBANDGAIN DATA RESPONSE");
-        console.log(response.data);
-
-        return response.data;
-
-    } catch (err) {
-
-        if (err.response) {
-            throw new Error(
-                err.response.data?.description ||
-                err.response.data?.message ||
-                "SubAndGain Data API Error"
-            );
-        }
-
-        throw new Error(err.message);
+    if (!apiNetwork) {
+        throw new Error("Unsupported Network");
     }
+
+    console.log("SENDING TO SUBANDGAIN");
+    console.log({
+        network: apiNetwork,
+        dataPlan,
+        phoneNumber: phone,
+    });
+
+    return request("/data.php", {
+        network: apiNetwork,
+        dataPlan,
+        phoneNumber: phone,
+    });
+
 }
 
-/**
- * Get Data Bundles
- */
+/*
+|--------------------------------------------------------------------------
+| QUERY DATA
+|--------------------------------------------------------------------------
+*/
+
+async function queryData(trans_id) {
+
+    return request("/query_data.php", {
+        trans_id,
+    });
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| GET DATA PLANS
+|--------------------------------------------------------------------------
+*/
 
 async function getDataPlans(network) {
 
@@ -172,7 +182,6 @@ async function getDataPlans(network) {
 
     const bundles = await request("/databundles.php");
 
-    // Find the requested network
     const networkData = bundles.find(
         item => item.NETWORK === apiNetwork
     );
@@ -180,21 +189,35 @@ async function getDataPlans(network) {
     if (!networkData) {
         throw new Error("Network not found");
     }
-    console.log(networkData.BUNDLE[0]);
 
-   const PROFIT = 100;
+    return networkData.BUNDLE.map(plan => {
 
-return networkData.BUNDLE.map(plan => ({
-    id: plan.dataPlan,
-    name: plan.dataBundle,
-    validity: plan.duration,
-    network: apiNetwork,
-    price: Number(plan.price[0].api_user) + pricing.data,
+        // SubAndGain price
+        const providerPrice = Number(
+            plan.price?.[0]?.api_user || 0
+        );
 
-   
-}));
+        // Your selling price
+        const sellingPrice =
+            providerPrice + (pricing.data || 0);
+
+        return {
+            id: plan.dataPlan,
+            code: plan.dataPlan,
+            name: plan.dataBundle,
+            validity: plan.duration,
+            network: apiNetwork,
+
+            // Provider price
+            providerPrice,
+
+            // Price shown to your users
+            price: sellingPrice,
+        };
+
+    });
+
 }
-
 /*
 |--------------------------------------------------------------------------
 | CABLE TV
@@ -203,6 +226,7 @@ return networkData.BUNDLE.map(plan => ({
 
 const CABLE_SERVICES = {
     DSTV: "DSTV",
+
     GOtv: "GOTV",
     GOTV: "GOTV",
     Gotv: "GOTV",
@@ -214,7 +238,7 @@ const CABLE_SERVICES = {
 
 /*
 |--------------------------------------------------------------------------
-| Verify Cable Customer
+| VERIFY CABLE CUSTOMER
 |--------------------------------------------------------------------------
 */
 
@@ -238,7 +262,7 @@ async function verifyCable({
 
 /*
 |--------------------------------------------------------------------------
-| Buy Cable
+| BUY CABLE
 |--------------------------------------------------------------------------
 */
 
@@ -264,9 +288,24 @@ async function buyCable({
 
 /*
 |--------------------------------------------------------------------------
-| Get Cable Packages
+| QUERY CABLE
 |--------------------------------------------------------------------------
 */
+
+async function queryCable(trans_id) {
+
+    return request("/query_bills.php", {
+        trans_id,
+    });
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| GET CABLE PACKAGES
+|--------------------------------------------------------------------------
+*/
+
 async function getCablePackages(service) {
 
     const apiService = CABLE_SERVICES[service];
@@ -287,14 +326,29 @@ async function getCablePackages(service) {
 
     return provider.BUNDLE
         .filter(plan => plan.status === "Active")
-        .map(plan => ({
-            code: plan.billsCode,
-            name: plan.package,
-            price: Number(plan.price),
-            service: apiService,
-        }));
-}
+        .map(plan => {
 
+            const providerPrice = Number(plan.price);
+
+            return {
+
+                code: plan.billsCode,
+
+                name: plan.package,
+
+                service: apiService,
+
+                // SubAndGain price
+                providerPrice,
+
+                // Price shown in your app
+                price: providerPrice + (pricing.cable || 0),
+
+            };
+
+        });
+
+}
 /*
 |--------------------------------------------------------------------------
 | ELECTRICITY
@@ -335,6 +389,7 @@ async function verifyElectricity({
     });
 
 }
+
 async function payElectricity({
     service,
     meterNumber,
@@ -348,11 +403,6 @@ async function payElectricity({
     if (!apiService) {
         throw new Error("Unsupported Disco");
     }
-    console.log({
-  service,
-  meterNumber,
-  meterType,
-});
 
     return request("/electricity.php", {
         service: apiService,
@@ -365,7 +415,6 @@ async function payElectricity({
 }
 
 async function getDiscos() {
-
     return [
         { code: "IKEDC", name: "Ikeja Electric" },
         { code: "EKEDC", name: "Eko Electric" },
@@ -380,8 +429,14 @@ async function getDiscos() {
         { code: "ABA", name: "Aba Power" },
         { code: "YEDC", name: "Yola Electric" },
     ];
-
 }
+
+/*
+|--------------------------------------------------------------------------
+| EDUCATION
+|--------------------------------------------------------------------------
+*/
+
 async function getEducationProducts() {
 
     const products = await request("/edu_prices.php");
@@ -389,28 +444,15 @@ async function getEducationProducts() {
     return products.map(item => ({
         code: item.eduType,
         name: item.package,
-        price: Number(item.price),
+
+        // Provider price
+        providerPrice: Number(item.price),
+
+        // Selling price (provider + your profit)
+        price: Number(item.price) + pricing.education,
     }));
-
 }
-async function getEducationProducts() {
 
-    const products = await request("/edu_prices.php");
-
-    return products.map(item => ({
-        code: item.eduType,
-        name: item.package,
-        price: Number(item.price),
-    }));
-
-}
-async function queryEducation(trans_id) {
-
-    return request("/query_education.php", {
-        trans_id,
-    });
-
-}
 async function buyEducation({ eduType }) {
 
     return request("/education.php", {
@@ -419,22 +461,40 @@ async function buyEducation({ eduType }) {
 
 }
 
+async function queryEducation(trans_id) {
+
+    return request("/query_education.php", {
+        trans_id,
+    });
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| EXPORTS
+|--------------------------------------------------------------------------
+*/
 
 module.exports = {
+    // Airtime
     buyAirtime,
     queryAirtime,
 
+    // Data
     buyData,
     getDataPlans,
 
+    // Cable
     verifyCable,
     buyCable,
     getCablePackages,
 
+    // Electricity
     getDiscos,
     verifyElectricity,
     payElectricity,
 
+    // Education
     getEducationProducts,
     buyEducation,
     queryEducation,
