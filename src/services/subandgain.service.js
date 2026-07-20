@@ -439,33 +439,37 @@ async function getDiscos() {
 
 async function getEducationProducts() {
 
-    const products = await request("/edu_prices.php");
+    const providers = await request("/edu_prices.php");
 
-    return products.map(item => ({
-        code: item.eduType,
-        name: item.package,
+    const products = [];
 
-        // Provider price
-        providerPrice: Number(item.price),
+    providers.forEach(service => {
 
-        // Selling price (provider + your profit)
-        price: Number(item.price) + pricing.education,
-    }));
+        service.BUNDLE
+            .filter(item => item.status === "Active")
+            .forEach(item => {
+
+                products.push({
+                    code: item.eduCode,
+                    name: `${service.SERVICE} ${item.eduCode}`,
+                    service: service.SERVICE,
+
+                    providerPrice: Number(item.price),
+
+                    price: Number(item.price) + pricing.education,
+                });
+
+            });
+
+    });
+
+    return products;
 }
-async function getEducationProducts() {
 
-    const products = await request("/edu_prices.php");
-
-    console.log("EDUCATION PRODUCTS");
-    console.log(JSON.stringify(products, null, 2));
-
-    return [];
-}
-
-async function buyEducation({ eduType }) {
+async function buyEducation({ eduCode }) {
 
     return request("/education.php", {
-        eduType,
+        eduCode,
     });
 
 }

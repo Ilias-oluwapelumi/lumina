@@ -690,9 +690,11 @@ exports.purchaseEducation = async (req, res) => {
         |--------------------------------------------------------------------------
         */
 
-        const response = await subAndGain.buyEducation({
-            eduType,
-        });
+       const { eduCode } = req.body;
+
+const response = await subAndGain.buyEducation({
+    eduCode,
+});
 
         console.log(response);
 
