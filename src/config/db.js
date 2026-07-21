@@ -41,6 +41,7 @@ const walletSchema = new mongoose.Schema({
   balance:       { type: Number, default: 0 },
   accountNumber: { type: String },
   bankName:      { type: String, default: 'Lumina Bank' },
+  monnifyAccountReference: { type: String, default: null },
 });
 
 const transactionSchema = new mongoose.Schema({
@@ -259,6 +260,14 @@ const db = {
 
   // Wallet Operations
   getWallet: (userId) => Wallet.findOne({ userId }).lean(),
+
+  setWalletAccountDetails: async (userId, { accountNumber, bankName, monnifyAccountReference }) => {
+    return await Wallet.findOneAndUpdate(
+      { userId },
+      { $set: { accountNumber, bankName, monnifyAccountReference } },
+      { new: true }
+    ).lean();
+  },
 
   debitWallet: async (userId, amount) => {
     const w = await Wallet.findOne({ userId });

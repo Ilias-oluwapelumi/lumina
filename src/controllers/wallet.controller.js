@@ -1,6 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db');
-const flutterwave = require('../services/flutterwave.service');
+const monnify = require('../services/monnify.service');
 
 // GET /api/wallet
 exports.getWallet = async (req, res) => {
@@ -13,12 +13,33 @@ exports.getWallet = async (req, res) => {
   }
 };
 
+/*
+|--------------------------------------------------------------------------
+| GET / CREATE FUNDING ACCOUNT (MONNIFY RESERVED ACCOUNT)
+|--------------------------------------------------------------------------
+| Unlike the old Paystack/Flutterwave flow, there's no "amount" up front —
+| the user gets ONE permanent account number and can transfer any amount,
+| any time. This reuses the /wallet/fund/initialize route your app already
+| calls, just with a different meaning: "make sure my funding account
+| exists, and tell me what it is."
+*/
 // POST /api/wallet/fund/initialize
 exports.initializeFunding = async (req, res) => {
   try {
-    const { amount } = req.body;
-    if (!amount || amount < 100) {
-      return res.status(400).json({ success: false, message: 'Minimum funding amount is ₦100' });
+    const wallet = await db.getWallet(req.user.id);
+    if (!wallet) {
+      return res.status(404).json({ success: false, message: 'Wallet not found' });
+    }
+
+    // Already provisioned — just hand back what's on file.
+    if (wallet.monnifyAccountReference) {
+      return res.json({
+        success: true,
+        data: {
+          accountNumber: wallet.accountNumber,
+          bankName: wallet.bankName,
+        },
+      });
     }
 
     const user = await db.findUserById(req.user.id);
@@ -26,97 +47,140 @@ exports.initializeFunding = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const reference = `FUND${Date.now()}`;
-
-    const payment = await flutterwave.initializePayment({
-      tx_ref: reference,
-      amount: parseFloat(amount),
-      email: user.email,
+    const account = await monnify.createReservedAccount({
+      accountReference: `WALLET-${req.user.id}`,
       name: user.fullName,
+      email: user.email,
       phone: user.phone,
-      redirect_url: process.env.FLW_REDIRECT_URL,
     });
 
-    // Record the transaction as pending now, locking in the amount the user
-    // actually requested. verifyFunding credits this recorded amount rather
-    // than trusting anything passed to it later.
-    await db.createTransaction({
-      userId: req.user.id,
-      type: 'credit',
-      category: 'fund',
-      title: 'Wallet Funding via Flutterwave',
-      amount: parseFloat(amount),
-      status: 'pending',
-      icon: 'account_balance',
-      reference,
+    // Monnify can return multiple partner banks for the same reserved
+    // account (e.g. Wema + a second bank) — any of them credits the same
+    // wallet. We show the first as the primary display account.
+    const primary = account.accounts?.[0];
+    if (!primary) {
+      throw new Error('Monnify did not return an account to use');
+    }
+
+    const updatedWallet = await db.setWalletAccountDetails(req.user.id, {
+      accountNumber: primary.accountNumber,
+      bankName: primary.bankName,
+      monnifyAccountReference: account.accountReference,
     });
 
     res.json({
       success: true,
-      message: 'Payment initialized',
       data: {
-        authorizationUrl: payment.link,
-        reference,
-        amount: parseFloat(amount),
+        accountNumber: updatedWallet.accountNumber,
+        bankName: updatedWallet.bankName,
       },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+/*
+|--------------------------------------------------------------------------
+| MANUAL REFRESH
+|--------------------------------------------------------------------------
+| Crediting now happens automatically via the Monnify webhook below — this
+| endpoint just re-fetches the current wallet, for a "pull to refresh" /
+| "check my balance" button in the app after the user has made a transfer.
+| Kept at the same route (/wallet/fund/verify) your app already calls.
+*/
+// POST /api/wallet/fund/verify
+exports.verifyFunding = async (req, res) => {
+  try {
+    const wallet = await db.getWallet(req.user.id);
+    if (!wallet) {
+      return res.status(404).json({ success: false, message: 'Wallet not found' });
+    }
+    res.json({
+      success: true,
+      message: 'Balance refreshed',
+      data: { wallet, transaction: { reference: '' } },
     });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
 };
 
-// POST /api/wallet/fund/verify
-exports.verifyFunding = async (req, res) => {
+/*
+|--------------------------------------------------------------------------
+| MONNIFY WEBHOOK — AUTO-CREDIT ON SUCCESSFUL TRANSFER
+|--------------------------------------------------------------------------
+| This is what actually credits the wallet. Called by Monnify's servers,
+| not by your app — must NOT have the `auth` middleware in front of it.
+|
+| IMPORTANT: this route needs the raw request body (Buffer) for signature
+| verification, not the parsed JSON your other routes get from
+| express.json(). See index.js wiring notes.
+*/
+// POST /api/wallet/webhook/monnify
+exports.monnifyWebhook = async (req, res) => {
   try {
-    const { reference } = req.body;
-    if (!reference) {
-      return res.status(400).json({ success: false, message: 'Reference required' });
+    const signature = req.headers['monnify-signature'];
+    const rawBody = req.body; // Buffer — see index.js wiring
+
+    if (!monnify.verifyWebhookSignature(rawBody, signature)) {
+      console.warn('Rejected Monnify webhook: invalid signature');
+      return res.status(401).json({ success: false });
     }
 
-    const existing = await db.getTransactionByReference(reference);
-    if (!existing) {
-      return res.status(404).json({ success: false, message: 'Transaction not found' });
-    }
-    if (existing.userId !== req.user.id) {
-      return res.status(403).json({ success: false, message: 'This transaction does not belong to you' });
-    }
+    const payload = JSON.parse(rawBody.toString('utf8'));
+    const { eventType, eventData } = payload;
 
-    // Idempotent — if we already credited this one, just return it again
-    // rather than erroring, since the user may tap "I've paid" more than once.
-    if (existing.status === 'successful') {
-      const wallet = await db.getWallet(req.user.id);
-      return res.json({
-        success: true,
-        message: 'Wallet already funded',
-        data: { wallet, transaction: existing },
-      });
+    if (eventType !== 'SUCCESSFUL_TRANSACTION') {
+      // Ack anything we don't act on so Monnify doesn't keep retrying it.
+      return res.status(200).json({ success: true });
     }
 
-    const payment = await flutterwave.verifyByReference(reference);
+    const accountReference = eventData?.product?.reference;
+    const paymentReference = eventData?.transactionReference;
+    const amountPaid = eventData?.amountPaid;
 
-    const paymentOk =
-      payment.status === 'successful' &&
-      payment.currency === 'NGN' &&
-      payment.tx_ref === reference &&
-      Number(payment.amount) >= Number(existing.amount);
-
-    if (!paymentOk) {
-      await db.updateTransactionStatus(reference, 'failed');
-      return res.status(400).json({ success: false, message: 'Payment not successful' });
+    if (!accountReference || !paymentReference || !amountPaid) {
+      console.warn('Monnify webhook missing expected fields', eventData);
+      return res.status(200).json({ success: true });
     }
 
-    // Credit using OUR recorded amount (already confirmed >= what was paid above),
-    // not a value read straight off the request.
-    const wallet = await db.creditWallet(req.user.id, Number(existing.amount));
-    const txn = await db.updateTransactionStatus(reference, 'successful');
+    // Idempotency — Monnify retries webhooks that don't get a fast 200,
+    // so the same payment can arrive more than once.
+    const existing = await db.getTransactionByReference(paymentReference);
+    if (existing) {
+      return res.status(200).json({ success: true });
+    }
 
-    res.json({
-      success: true,
-      message: `₦${Number(existing.amount).toLocaleString()} added to your wallet`,
-      data: { wallet, transaction: txn },
+    if (!accountReference.startsWith('WALLET-')) {
+      console.warn('Unrecognized Monnify account reference:', accountReference);
+      return res.status(200).json({ success: true });
+    }
+
+    const userId = accountReference.replace('WALLET-', '');
+
+    await db.creditWallet(userId, Number(amountPaid));
+
+    await db.createTransaction({
+      userId,
+      type: 'credit',
+      category: 'fund',
+      title: 'Wallet Funding via Monnify',
+      amount: Number(amountPaid),
+      status: 'successful',
+      icon: 'account_balance',
+      reference: paymentReference,
+      meta: { provider: 'monnify', eventData },
     });
+
+    return res.status(200).json({ success: true });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    console.error('Monnify webhook error:', err);
+    // Return 200 even on our own bug so Monnify doesn't hammer retries —
+    // but this is logged loudly above so you catch it. Switch to 500 once
+    // this has been running cleanly for a while if you'd rather it retry.
+    return res.status(200).json({ success: false });
   }
 };
 

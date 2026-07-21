@@ -109,6 +109,30 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
+| MONNIFY WEBHOOK
+|--------------------------------------------------------------------------
+| No `auth` middleware — Monnify's servers call this directly, not a
+| logged-in user. Security comes from verifying the signature inside the
+| controller instead.
+|
+| express.raw() here (NOT express.json()) is required so the controller
+| gets the exact raw bytes Monnify sent — needed for the HMAC signature
+| check. If your app.js/server.js already applies express.json() globally
+| before this router is mounted, that will consume/parse the body first
+| and this route will get an already-parsed object instead of a Buffer,
+| breaking signature verification. Make sure this route (or this whole
+| router) is registered before any global express.json() middleware, or
+| carve out this specific path with its own raw parser ahead of the global
+| json() call in your app.js.
+*/
+router.post(
+    "/wallet/webhook/monnify",
+    express.raw({ type: "application/json" }),
+    walletCtrl.monnifyWebhook
+);
+
+/*
+|--------------------------------------------------------------------------
 | TRANSACTIONS
 |--------------------------------------------------------------------------
 */
