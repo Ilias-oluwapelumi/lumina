@@ -690,11 +690,14 @@ exports.purchaseEducation = async (req, res) => {
         |--------------------------------------------------------------------------
         */
 
-       const { eduCode } = req.body;
-
-const response = await subAndGain.buyEducation({
-    eduCode,
-});
+        // Use the already-validated product's code — this is the value
+        // that was matched against SubAndGain's own bundle list above.
+        // (Previously this read a separate `eduCode` field from the
+        // request body that the frontend never sent, so it was always
+        // undefined and every purchase would fail against the provider.)
+        const response = await subAndGain.buyEducation({
+            eduCode: product.code,
+        });
 
         console.log(response);
 
