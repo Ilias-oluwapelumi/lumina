@@ -298,6 +298,14 @@ const db = {
   getTransactionById:        (id)        => Transaction.findOne({ id }).lean(),
   getTransactionByReference: (reference) => Transaction.findOne({ reference }).lean(),
 
+  updateTransactionStatus: async (reference, status) => {
+    return await Transaction.findOneAndUpdate(
+      { reference },
+      { $set: { status } },
+      { new: true }
+    ).lean();
+  },
+
   // ===============================
 // PRODUCT PRICES
 // ===============================
