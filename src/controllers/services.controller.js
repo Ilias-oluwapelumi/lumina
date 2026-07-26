@@ -98,6 +98,7 @@ exports.buyAirtime = async (req, res) => {
             data: {
                 wallet: updatedWallet,
                 transaction: txn,
+                reference,
                 provider: response,
             },
         });
@@ -258,6 +259,7 @@ exports.buyData = async (req, res) => {
             data: {
                 wallet: updatedWallet,
                 transaction: txn,
+                reference,
                 provider: response,
             },
         });
@@ -432,6 +434,7 @@ exports.buyCable = async (req, res) => {
             data: {
                 wallet: updatedWallet,
                 transaction: txn,
+                reference,
                 provider: response,
             },
         });
@@ -596,6 +599,7 @@ exports.payElectricity = async (req, res) => {
             data: {
                 wallet: updatedWallet,
                 transaction: txn,
+                reference,
                 token: response.MeterToken,
                 provider: response,
             },
