@@ -33,6 +33,7 @@ const userSchema = new mongoose.Schema({
   kycTier: { type: Number, default: 1 },
   kycVerified: { type: Boolean, default: false },
   avatarUrl: { type: String, default: null },
+  suspended: { type: Boolean, default: false },
   createdAt: { type: String, default: () => new Date().toISOString() },
 });
 
@@ -103,11 +104,21 @@ const notificationSchema = new mongoose.Schema({
   meta:    { type: mongoose.Schema.Types.Mixed },
 });
 
+const adminSchema = new mongoose.Schema({
+  id:           { type: String, default: () => uuidv4(), unique: true },
+  fullName:     { type: String, required: true },
+  email:        { type: String, required: true, unique: true },
+  passwordHash: { type: String, required: true },
+  role:         { type: String, default: 'admin' }, // admin, superadmin
+  createdAt:    { type: String, default: () => new Date().toISOString() },
+});
+
 const User         = mongoose.models.User         || mongoose.model('User', userSchema);
 const Wallet       = mongoose.models.Wallet       || mongoose.model('Wallet', walletSchema);
 const Transaction  = mongoose.models.Transaction  || mongoose.model('Transaction', transactionSchema);
 const RefreshToken = mongoose.models.RefreshToken || mongoose.model('RefreshToken', refreshTokenSchema);
 const Notification  = mongoose.models.Notification  || mongoose.model('Notification', notificationSchema);
+const Admin         = mongoose.models.Admin         || mongoose.model('Admin', adminSchema);
 
 const ProductPrice =
     mongoose.models.ProductPrice ||
@@ -138,6 +149,20 @@ async function seed() {
 }
 
 mongoose.connection.once('open', seed);
+
+// ─── SEED DEFAULT ADMIN ──────────────────────────────────────────────────────
+async function seedAdmin() {
+  const exists = await Admin.findOne({ email: 'admin@lumina.ng' });
+  if (exists) return;
+  const passwordHash = await bcrypt.hash('Admin@12345', 10);
+  await Admin.create({
+    id: uuidv4(), fullName: 'Lumina Super Admin', email: 'admin@lumina.ng',
+    passwordHash, role: 'superadmin',
+  });
+  console.log('✅ Default admin seeded — email: admin@lumina.ng | password: Admin@12345');
+}
+
+mongoose.connection.once('open', seedAdmin);
 
 // Helper to query flexibly by custom id (UUID string) or Mongo native ObjectId
 const getFilter = (id) => {
@@ -425,6 +450,138 @@ updateProductPrice: async ({
   storeRefreshToken:  (token) => RefreshToken.create({ token }),
   hasRefreshToken:    (token) => RefreshToken.exists({ token }),
   deleteRefreshToken: (token) => RefreshToken.deleteOne({ token }),
+
+  // ===============================
+  // ADMIN OPERATIONS
+  // ===============================
+
+  findAdminByEmail: (email) => Admin.findOne({ email }).lean(),
+  verifyAdminPassword: (admin, plain) => bcrypt.compare(plain, admin.passwordHash),
+
+  getDashboardStats: async () => {
+    const totalUsers = await User.countDocuments();
+    const verifiedUsers = await User.countDocuments({ kycVerified: true });
+    const suspendedUsers = await User.countDocuments({ suspended: true });
+
+    const walletAgg = await Wallet.aggregate([
+      { $group: { _id: null, totalBalance: { $sum: '$balance' } } },
+    ]);
+    const totalWalletBalance = walletAgg[0]?.totalBalance || 0;
+
+    const txnByStatus = await Transaction.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 }, amount: { $sum: '$amount' } } },
+    ]);
+
+    const txnByCategory = await Transaction.aggregate([
+      { $match: { status: 'successful' } },
+      { $group: { _id: '$category', count: { $sum: 1 }, amount: { $sum: '$amount' } } },
+    ]);
+
+    const totalTransactions = await Transaction.countDocuments();
+
+    return {
+      totalUsers,
+      verifiedUsers,
+      suspendedUsers,
+      totalWalletBalance,
+      totalTransactions,
+      byStatus: txnByStatus,
+      byCategory: txnByCategory,
+    };
+  },
+
+  searchUsers: async ({ query, page = 1, limit = 20 } = {}) => {
+    const filter = query
+      ? {
+          $or: [
+            { fullName: { $regex: query, $options: 'i' } },
+            { email: { $regex: query, $options: 'i' } },
+            { phone: { $regex: query, $options: 'i' } },
+          ],
+        }
+      : {};
+    const total = await User.countDocuments(filter);
+    const users = await User.find(filter)
+      .select('-passwordHash -transactionPin')
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+    return { users, total, page, limit };
+  },
+
+  setUserSuspended: async (id, suspended) => {
+    const filter = getFilter(id);
+    const result = await User.updateOne(filter, { $set: { suspended } });
+    if (!result.matchedCount) throw new Error('User not found');
+    return result;
+  },
+
+  searchTransactions: async ({ query, status, category, page = 1, limit = 20 } = {}) => {
+    const filter = {};
+    if (status) filter.status = status;
+    if (category) filter.category = category;
+    if (query) {
+      filter.$or = [
+        { reference: { $regex: query, $options: 'i' } },
+        { title: { $regex: query, $options: 'i' } },
+      ];
+    }
+    const total = await Transaction.countDocuments(filter);
+    const transactions = await Transaction.find(filter)
+      .sort({ date: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+    return { transactions, total, page, limit };
+  },
+
+  adminAdjustWallet: async (userId, amount, note, adminEmail) => {
+    const numericAmount = parseFloat(amount);
+    const w = await Wallet.findOne({ userId });
+    if (!w) throw new Error('Wallet not found');
+    w.balance = parseFloat((w.balance + numericAmount).toFixed(2));
+    await w.save();
+
+    const txn = await Transaction.create({
+      id: uuidv4(),
+      userId,
+      type: numericAmount >= 0 ? 'credit' : 'debit',
+      category: 'admin_adjustment',
+      title: numericAmount >= 0 ? 'Wallet Credit (Admin)' : 'Wallet Debit (Admin)',
+      amount: Math.abs(numericAmount),
+      status: 'successful',
+      icon: 'account_balance_wallet',
+      reference: `ADJ${Date.now()}`,
+      meta: { note: note || '', adjustedBy: adminEmail || 'admin' },
+    });
+
+    await Notification.create({
+      id: uuidv4(),
+      userId,
+      type: 'transaction',
+      title: numericAmount >= 0 ? 'Wallet Credited' : 'Wallet Debited',
+      message: `₦${Math.abs(numericAmount).toLocaleString()} ${numericAmount >= 0 ? 'credited to' : 'debited from'} your wallet by support${note ? `: ${note}` : ''}`,
+      icon: 'account_balance_wallet',
+      meta: { reference: txn.reference, category: 'admin_adjustment' },
+    });
+
+    return { wallet: w.toObject(), transaction: txn.toObject() };
+  },
+
+  broadcastNotification: async ({ title, message, icon = 'notifications', type = 'promo' }) => {
+    const users = await User.find({}, { id: 1 }).lean();
+    const docs = users.map((u) => ({
+      id: uuidv4(),
+      userId: u.id,
+      type,
+      title,
+      message,
+      icon,
+    }));
+    if (docs.length) await Notification.insertMany(docs);
+    return { recipients: docs.length };
+  },
 };
 
 module.exports = db;

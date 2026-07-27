@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const auth = require("../middleware/auth");
+const adminAuth = require("../middleware/admin_auth");
 const verifyTransactionPin = require("../middleware/verifytransactionPin");
 
 const authCtrl = require("../controllers/auth.controller");
@@ -10,6 +11,7 @@ const servicesCtrl = require("../controllers/services.controller");
 const txnCtrl = require("../controllers/transactions.controller");
 const userCtrl = require("../controllers/user.controller");
 const notificationsCtrl = require("../controllers/notifications.controller");
+const adminCtrl = require("../controllers/admin.controller");
 
 /*
 |--------------------------------------------------------------------------
@@ -330,6 +332,33 @@ if (typeof servicesCtrl.fundBetting === "function") {
         servicesCtrl.fundBetting
     );
 }
+
+/*
+|--------------------------------------------------------------------------
+| ADMIN
+|--------------------------------------------------------------------------
+| Separate token scope (adminAuth) from regular user auth — an admin token
+| cannot be used on /users or /wallet routes and vice versa.
+*/
+
+router.post("/admin/login", adminCtrl.login);
+
+router.get("/admin/me", adminAuth, adminCtrl.me);
+
+router.get("/admin/dashboard", adminAuth, adminCtrl.getDashboard);
+
+router.get("/admin/users", adminAuth, adminCtrl.getUsers);
+router.get("/admin/users/:id", adminAuth, adminCtrl.getUserDetail);
+router.post("/admin/users/:id/suspend", adminAuth, adminCtrl.suspendUser);
+router.post("/admin/users/:id/unsuspend", adminAuth, adminCtrl.unsuspendUser);
+router.post("/admin/users/:id/adjust-wallet", adminAuth, adminCtrl.adjustWallet);
+
+router.get("/admin/transactions", adminAuth, adminCtrl.getTransactions);
+
+router.get("/admin/pricing/:category", adminAuth, adminCtrl.getPricing);
+router.post("/admin/pricing", adminAuth, adminCtrl.updatePricing);
+
+router.post("/admin/notifications/broadcast", adminAuth, adminCtrl.broadcast);
 
 /*
 |--------------------------------------------------------------------------
