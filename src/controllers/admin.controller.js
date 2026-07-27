@@ -49,6 +49,27 @@ exports.me = async (req, res) => {
   });
 };
 
+// POST /api/admin/change-password
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Both fields are required' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 8 characters' });
+    }
+    const valid = await db.verifyAdminPassword(req.admin, currentPassword);
+    if (!valid) {
+      return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+    }
+    await db.changeAdminPassword(req.admin.email, newPassword);
+    res.json({ success: true, message: 'Password changed successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // GET /api/admin/dashboard
 exports.getDashboard = async (req, res) => {
   try {

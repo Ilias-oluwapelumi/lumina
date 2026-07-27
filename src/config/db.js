@@ -458,6 +458,13 @@ updateProductPrice: async ({
   findAdminByEmail: (email) => Admin.findOne({ email }).lean(),
   verifyAdminPassword: (admin, plain) => bcrypt.compare(plain, admin.passwordHash),
 
+  changeAdminPassword: async (email, newPassword) => {
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const result = await Admin.updateOne({ email }, { $set: { passwordHash } });
+    if (!result.matchedCount) throw new Error('Admin not found');
+    return result;
+  },
+
   getDashboardStats: async () => {
     const totalUsers = await User.countDocuments();
     const verifiedUsers = await User.countDocuments({ kycVerified: true });

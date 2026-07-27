@@ -345,6 +345,8 @@ router.post("/admin/login", adminCtrl.login);
 
 router.get("/admin/me", adminAuth, adminCtrl.me);
 
+router.post("/admin/change-password", adminAuth, adminCtrl.changePassword);
+
 router.get("/admin/dashboard", adminAuth, adminCtrl.getDashboard);
 
 router.get("/admin/users", adminAuth, adminCtrl.getUsers);
