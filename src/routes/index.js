@@ -9,6 +9,7 @@ const walletCtrl = require("../controllers/wallet.controller");
 const servicesCtrl = require("../controllers/services.controller");
 const txnCtrl = require("../controllers/transactions.controller");
 const userCtrl = require("../controllers/user.controller");
+const notificationsCtrl = require("../controllers/notifications.controller");
 
 /*
 |--------------------------------------------------------------------------
@@ -67,6 +68,36 @@ router.post(
     "/users/change-pin",
     auth,
     userCtrl.changePin
+);
+
+/*
+|--------------------------------------------------------------------------
+| NOTIFICATIONS
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+    "/notifications",
+    auth,
+    notificationsCtrl.getNotifications
+);
+
+router.get(
+    "/notifications/unread-count",
+    auth,
+    notificationsCtrl.getUnreadCount
+);
+
+router.post(
+    "/notifications/:id/read",
+    auth,
+    notificationsCtrl.markRead
+);
+
+router.post(
+    "/notifications/read-all",
+    auth,
+    notificationsCtrl.markAllRead
 );
 
 /*

@@ -120,6 +120,14 @@ console.log("req.user._id =", req.user._id);
 
         await db.setTransactionPin(req.user, hash);
 
+        await db.createNotification({
+            userId: req.user.id,
+            type: "security",
+            title: "Transaction PIN Created",
+            message: "Your transaction PIN was set up successfully",
+            icon: "security",
+        });
+
         return res.json({
             success: true,
             message: 'Transaction PIN created successfully'
@@ -186,6 +194,14 @@ exports.changePin = async (req, res) => {
             req.user.id,
             hash
         );
+
+        await db.createNotification({
+            userId: req.user.id,
+            type: "security",
+            title: "Transaction PIN Changed",
+            message: "Your transaction PIN was changed successfully. If this wasn't you, contact support immediately.",
+            icon: "security",
+        });
 
         return res.json({
             success: true,

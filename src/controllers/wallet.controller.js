@@ -174,6 +174,15 @@ exports.monnifyWebhook = async (req, res) => {
       meta: { provider: 'monnify', eventData },
     });
 
+    await db.createNotification({
+      userId,
+      type: 'transaction',
+      title: 'Wallet Funded',
+      message: `₦${Number(amountPaid).toLocaleString()} received via bank transfer`,
+      icon: 'account_balance',
+      meta: { reference: paymentReference, category: 'fund' },
+    });
+
     return res.status(200).json({ success: true });
   } catch (err) {
     console.error('Monnify webhook error:', err);
@@ -205,6 +214,14 @@ exports.withdraw = async (req, res) => {
       icon: 'account_balance_wallet',
       reference: `WDR${Date.now()}`,
       meta: { accountNumber, bankName },
+    });
+    await db.createNotification({
+      userId: req.user.id,
+      type: 'transaction',
+      title: 'Withdrawal Successful',
+      message: `₦${Number(amount).toLocaleString()} sent to ${bankName}`,
+      icon: 'account_balance_wallet',
+      meta: { reference: txn.reference, category: 'withdrawal' },
     });
     res.json({
       success: true,
@@ -238,6 +255,14 @@ exports.transfer = async (req, res) => {
       icon: 'send',
       reference: ref,
       meta: { accountNumber, bankName, note },
+    });
+    await db.createNotification({
+      userId: req.user.id,
+      type: 'transaction',
+      title: 'Transfer Successful',
+      message: `₦${Number(amount).toLocaleString()} sent to ${bankName}`,
+      icon: 'send',
+      meta: { reference: ref, category: 'transfer' },
     });
     res.json({
       success: true,

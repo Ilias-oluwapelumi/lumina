@@ -91,10 +91,23 @@ const refreshTokenSchema = new mongoose.Schema({
   token: { type: String, required: true, unique: true },
 });
 
+const notificationSchema = new mongoose.Schema({
+  id:      { type: String, default: () => uuidv4(), unique: true },
+  userId:  { type: String, required: true },
+  type:    { type: String, default: 'general' }, // transaction, security, promo, general
+  title:   { type: String, required: true },
+  message: { type: String, required: true },
+  icon:    { type: String, default: 'notifications' },
+  read:    { type: Boolean, default: false },
+  date:    { type: String, default: () => new Date().toISOString() },
+  meta:    { type: mongoose.Schema.Types.Mixed },
+});
+
 const User         = mongoose.models.User         || mongoose.model('User', userSchema);
 const Wallet       = mongoose.models.Wallet       || mongoose.model('Wallet', walletSchema);
 const Transaction  = mongoose.models.Transaction  || mongoose.model('Transaction', transactionSchema);
 const RefreshToken = mongoose.models.RefreshToken || mongoose.model('RefreshToken', refreshTokenSchema);
+const Notification  = mongoose.models.Notification  || mongoose.model('Notification', notificationSchema);
 
 const ProductPrice =
     mongoose.models.ProductPrice ||
@@ -375,6 +388,38 @@ updateProductPrice: async ({
     ).lean();
 
 },
+
+  // Notification Operations
+  createNotification: async ({ userId, type = 'general', title, message, icon = 'notifications', meta }) => {
+    const n = await Notification.create({ id: uuidv4(), userId, type, title, message, icon, meta });
+    return n.toObject();
+  },
+
+  getUserNotifications: async (userId, { page = 1, limit = 20 } = {}) => {
+    const filter = { userId };
+    const total = await Notification.countDocuments(filter);
+    const notifications = await Notification.find(filter)
+      .sort({ date: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+    return { notifications, total, page, limit };
+  },
+
+  getUnreadNotificationCount: (userId) =>
+    Notification.countDocuments({ userId, read: false }),
+
+  markNotificationRead: async (id, userId) => {
+    return await Notification.findOneAndUpdate(
+      { id, userId },
+      { $set: { read: true } },
+      { new: true }
+    ).lean();
+  },
+
+  markAllNotificationsRead: async (userId) => {
+    return await Notification.updateMany({ userId, read: false }, { $set: { read: true } });
+  },
 
   // Token Store Operations
   storeRefreshToken:  (token) => RefreshToken.create({ token }),

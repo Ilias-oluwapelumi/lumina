@@ -92,6 +92,15 @@ exports.buyAirtime = async (req, res) => {
             },
         });
 
+        await db.createNotification({
+            userId: req.user.id,
+            type: "transaction",
+            title: "Airtime Purchase Successful",
+            message: `₦${amountToCharge.toLocaleString()} ${network} airtime sent to ${phone}`,
+            icon: "phone",
+            meta: { reference, category: "airtime" },
+        });
+
         return res.json({
             success: true,
             message: "Airtime purchased successfully",
@@ -251,6 +260,15 @@ exports.buyData = async (req, res) => {
                 providerReference: response.trans_id,
                 providerResponse: response,
             },
+        });
+
+        await db.createNotification({
+            userId: req.user.id,
+            type: "transaction",
+            title: "Data Purchase Successful",
+            message: `${selectedPlan.name} data sent to ${phone} on ${network}`,
+            icon: "wifi",
+            meta: { reference, category: "data" },
         });
 
         return res.json({
@@ -422,6 +440,15 @@ exports.buyCable = async (req, res) => {
             },
         });
 
+        await db.createNotification({
+            userId: req.user.id,
+            type: "transaction",
+            title: "Cable Subscription Successful",
+            message: `${service} ${selectedPackage.name} subscription active`,
+            icon: "tv",
+            meta: { reference, category: "cable" },
+        });
+
         /*
         |--------------------------------------------------------------------------
         | Success
@@ -585,6 +612,15 @@ exports.payElectricity = async (req, res) => {
                 providerReference: response.trans_id,
                 providerResponse: response,
             },
+        });
+
+        await db.createNotification({
+            userId: req.user.id,
+            type: "transaction",
+            title: "Electricity Purchase Successful",
+            message: `₦${amountToCharge.toLocaleString()} ${service} token generated`,
+            icon: "bolt",
+            meta: { reference, category: "electricity" },
         });
 
         /*
@@ -758,6 +794,15 @@ exports.purchaseEducation = async (req, res) => {
                 providerReference: response.trans_id,
                 providerResponse: response,
             },
+        });
+
+        await db.createNotification({
+            userId: req.user.id,
+            type: "transaction",
+            title: "Education PIN Purchased",
+            message: `${product.name} PIN generated successfully`,
+            icon: "school",
+            meta: { reference, category: "education" },
         });
 
         /*
