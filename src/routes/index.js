@@ -72,6 +72,18 @@ router.post(
     userCtrl.changePin
 );
 
+router.get(
+    "/users/notification-preferences",
+    auth,
+    userCtrl.getNotificationPreferences
+);
+
+router.patch(
+    "/users/notification-preferences",
+    auth,
+    userCtrl.updateNotificationPreferences
+);
+
 /*
 |--------------------------------------------------------------------------
 | NOTIFICATIONS
@@ -346,6 +358,13 @@ router.post("/admin/login", adminCtrl.login);
 router.get("/admin/me", adminAuth, adminCtrl.me);
 
 router.post("/admin/change-password", adminAuth, adminCtrl.changePassword);
+
+router.get("/admin/admins", adminAuth, adminCtrl.getAdmins);
+router.post("/admin/admins", adminAuth, adminCtrl.createAdmin);
+router.post("/admin/admins/:email/delete", adminAuth, adminCtrl.deleteAdmin);
+
+router.get("/admin/settings/notifications", adminAuth, adminCtrl.getNotificationSettings);
+router.post("/admin/settings/notifications", adminAuth, adminCtrl.updateNotificationSettings);
 
 router.get("/admin/dashboard", adminAuth, adminCtrl.getDashboard);
 

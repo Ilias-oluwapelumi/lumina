@@ -34,6 +34,12 @@ const userSchema = new mongoose.Schema({
   kycVerified: { type: Boolean, default: false },
   avatarUrl: { type: String, default: null },
   suspended: { type: Boolean, default: false },
+  notificationPrefs: {
+    push: { type: Boolean, default: true },
+    email: { type: Boolean, default: true },
+    sms: { type: Boolean, default: false },
+    promotions: { type: Boolean, default: true },
+  },
   createdAt: { type: String, default: () => new Date().toISOString() },
 });
 
@@ -113,12 +119,26 @@ const adminSchema = new mongoose.Schema({
   createdAt:    { type: String, default: () => new Date().toISOString() },
 });
 
+// Singleton document (id: 'global') — the master switches for each
+// notification channel. If a channel is off here, no user can turn it on,
+// regardless of their personal preference.
+const settingsSchema = new mongoose.Schema({
+  id:                { type: String, default: 'global', unique: true },
+  pushEnabled:       { type: Boolean, default: false },
+  emailEnabled:      { type: Boolean, default: false },
+  smsEnabled:        { type: Boolean, default: false },
+  promotionsEnabled: { type: Boolean, default: true },
+  updatedAt:         { type: String, default: () => new Date().toISOString() },
+  updatedBy:         { type: String, default: null },
+});
+
 const User         = mongoose.models.User         || mongoose.model('User', userSchema);
 const Wallet       = mongoose.models.Wallet       || mongoose.model('Wallet', walletSchema);
 const Transaction  = mongoose.models.Transaction  || mongoose.model('Transaction', transactionSchema);
 const RefreshToken = mongoose.models.RefreshToken || mongoose.model('RefreshToken', refreshTokenSchema);
 const Notification  = mongoose.models.Notification  || mongoose.model('Notification', notificationSchema);
 const Admin         = mongoose.models.Admin         || mongoose.model('Admin', adminSchema);
+const Settings      = mongoose.models.Settings      || mongoose.model('Settings', settingsSchema);
 
 const ProductPrice =
     mongoose.models.ProductPrice ||
@@ -463,6 +483,73 @@ updateProductPrice: async ({
     const result = await Admin.updateOne({ email }, { $set: { passwordHash } });
     if (!result.matchedCount) throw new Error('Admin not found');
     return result;
+  },
+
+  createAdmin: async ({ fullName, email, password, role = 'admin' }) => {
+    const exists = await Admin.findOne({ email });
+    if (exists) throw new Error('An admin with this email already exists');
+    const passwordHash = await bcrypt.hash(password, 10);
+    const admin = await Admin.create({
+      id: uuidv4(), fullName, email, passwordHash, role,
+    });
+    return admin.toObject();
+  },
+
+  listAdmins: () =>
+    Admin.find({}, { passwordHash: 0 }).sort({ createdAt: -1 }).lean(),
+
+  deleteAdmin: async (email) => {
+    const result = await Admin.deleteOne({ email });
+    if (!result.deletedCount) throw new Error('Admin not found');
+    return result;
+  },
+
+  // ===============================
+  // NOTIFICATION CHANNEL SETTINGS (admin-controlled, global)
+  // ===============================
+
+  getNotificationSettings: async () => {
+    let settings = await Settings.findOne({ id: 'global' }).lean();
+    if (!settings) {
+      settings = await Settings.create({ id: 'global' });
+      settings = settings.toObject();
+    }
+    return settings;
+  },
+
+  updateNotificationSettings: async (fields, adminEmail) => {
+    const allowed = ['pushEnabled', 'emailEnabled', 'smsEnabled', 'promotionsEnabled'];
+    const $set = { updatedAt: new Date().toISOString(), updatedBy: adminEmail || null };
+    for (const key of allowed) {
+      if (fields[key] !== undefined) $set[key] = !!fields[key];
+    }
+    const settings = await Settings.findOneAndUpdate(
+      { id: 'global' },
+      { $set },
+      { new: true, upsert: true }
+    ).lean();
+    return settings;
+  },
+
+  // A user's own per-channel preference, constrained by the admin's global
+  // settings — a channel the admin has turned off is always reported as off
+  // here regardless of what the user previously chose.
+  getUserNotificationPrefs: async (userId) => {
+    const user = await User.findOne(getFilter(userId), { notificationPrefs: 1 }).lean();
+    if (!user) throw new Error('User not found');
+    return user.notificationPrefs || { push: true, email: true, sms: false, promotions: true };
+  },
+
+  updateUserNotificationPrefs: async (userId, prefs) => {
+    const allowed = ['push', 'email', 'sms', 'promotions'];
+    const filter = getFilter(userId);
+    const $set = {};
+    for (const key of allowed) {
+      if (prefs[key] !== undefined) $set[`notificationPrefs.${key}`] = !!prefs[key];
+    }
+    const result = await User.findOneAndUpdate(filter, { $set }, { new: true }).lean();
+    if (!result) throw new Error('User not found');
+    return result.notificationPrefs;
   },
 
   getDashboardStats: async () => {

@@ -286,3 +286,67 @@ exports.verifyPin = async (req, res) => {
 
     }
 };
+// GET /api/users/notification-preferences
+// Returns the admin's global channel switches alongside the user's own
+// per-channel choice, so the app can show a channel as unavailable when
+// the admin has disabled it globally — regardless of the user's saved
+// preference for that channel.
+exports.getNotificationPreferences = async (req, res) => {
+    try {
+        const adminSettings = await db.getNotificationSettings();
+        const myPreferences = await db.getUserNotificationPrefs(req.user.id);
+
+        return res.json({
+            success: true,
+            data: {
+                adminSettings: {
+                    push: adminSettings.pushEnabled,
+                    email: adminSettings.emailEnabled,
+                    sms: adminSettings.smsEnabled,
+                    promotions: adminSettings.promotionsEnabled,
+                },
+                myPreferences,
+            },
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// PATCH /api/users/notification-preferences
+exports.updateNotificationPreferences = async (req, res) => {
+    try {
+        const { push, email, sms, promotions } = req.body;
+        const adminSettings = await db.getNotificationSettings();
+
+        // A user can never enable a channel the admin has turned off
+        // globally — reject it explicitly instead of silently ignoring it,
+        // so the app can show a clear message.
+        const requested = { push, email, sms, promotions };
+        const adminMap = {
+            push: adminSettings.pushEnabled,
+            email: adminSettings.emailEnabled,
+            sms: adminSettings.smsEnabled,
+            promotions: adminSettings.promotionsEnabled,
+        };
+
+        for (const key of Object.keys(requested)) {
+            if (requested[key] === true && !adminMap[key]) {
+                return res.status(403).json({
+                    success: false,
+                    message: `${key.charAt(0).toUpperCase()}${key.slice(1)} notifications are currently disabled by the admin`,
+                });
+            }
+        }
+
+        const updated = await db.updateUserNotificationPrefs(req.user.id, requested);
+
+        return res.json({
+            success: true,
+            message: 'Notification preferences updated',
+            data: { myPreferences: updated },
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
