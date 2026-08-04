@@ -4,6 +4,71 @@ const subAndGain = require("../services/subandgain.service");
 
 /*
 |--------------------------------------------------------------------------
+| ADMIN PRICE OVERRIDES
+|--------------------------------------------------------------------------
+| Data, cable, and education prices are per-plan and managed by the admin
+| in ProductPrice. The first time a plan/package/product is seen, it's
+| auto-seeded here with the default provider price + flat margin so it
+| shows up immediately in the admin Pricing screen — from then on, the
+| admin's saved sellingPrice is what gets shown to users and charged.
+*/
+
+// Single-item resolver — used in the buy/purchase handlers, where the
+// current admin-set price is what gets charged, even if it changed since
+// the plan list was last fetched.
+async function resolveSellingPrice({
+    category, provider, productCode, productName, providerPrice, defaultMargin,
+}) {
+    const code = String(productCode);
+    const existing = await db.getProductPrice({ category, provider, productCode: code });
+    if (existing) return existing.sellingPrice;
+
+    const sellingPrice = Number(providerPrice || 0) + defaultMargin;
+    await db.updateProductPrice({
+        category, provider, productCode: code,
+        productName, buyingPrice: Number(providerPrice || 0), sellingPrice,
+    }).catch((err) => console.error("Failed to seed product price:", err.message));
+
+    return sellingPrice;
+}
+
+// Batch resolver — used when listing plans/packages/products, so the
+// price shown to the user always matches what they'll actually be charged.
+async function applyPriceOverrides(category, items, {
+    codeOf, providerOf, providerPriceOf, nameOf, priceKeySet, defaultMargin,
+}) {
+    const existing = await db.getAllProductPrices(category);
+    const map = new Map(existing.map((e) => [`${e.provider}::${e.productCode}`, e]));
+    const toSeed = [];
+
+    for (const item of items) {
+        const provider = providerOf(item);
+        const code = String(codeOf(item));
+        const found = map.get(`${provider}::${code}`);
+
+        if (found) {
+            priceKeySet(item, found.sellingPrice);
+        } else {
+            const providerPrice = Number(providerPriceOf(item) || 0);
+            const sellingPrice = providerPrice + defaultMargin;
+            priceKeySet(item, sellingPrice);
+            toSeed.push({
+                category, provider, productCode: code,
+                productName: nameOf(item), buyingPrice: providerPrice, sellingPrice,
+            });
+        }
+    }
+
+    for (const p of toSeed) {
+        await db.updateProductPrice(p).catch((err) =>
+            console.error("Failed to seed product price:", err.message));
+    }
+
+    return items;
+}
+
+/*
+|--------------------------------------------------------------------------
 | BUY AIRTIME
 |--------------------------------------------------------------------------
 */
@@ -181,8 +246,17 @@ exports.buyData = async (req, res) => {
             });
         }
 
-        // Price already includes your profit
-        const amountToCharge = Number(selectedPlan.price);
+        // Always charge whatever the admin currently has this plan priced
+        // at — not the price the client saw in an earlier plan listing —
+        // so a mid-session admin price change takes effect immediately.
+        const amountToCharge = await resolveSellingPrice({
+            category: "data",
+            provider: selectedPlan.network,
+            productCode: selectedPlan.id,
+            productName: selectedPlan.name,
+            providerPrice: selectedPlan.providerPrice,
+            defaultMargin: pricing.data,
+        });
 
         if (wallet.balance < amountToCharge) {
             return res.status(400).json({
@@ -359,8 +433,15 @@ exports.buyCable = async (req, res) => {
         |--------------------------------------------------------------------------
         */
 
-        // getCablePackages() already returns selling price
-        const amountToCharge = Number(selectedPackage.price);
+        // Always charge the admin's current price for this package.
+        const amountToCharge = await resolveSellingPrice({
+            category: "cable",
+            provider: selectedPackage.service,
+            productCode: selectedPackage.code,
+            productName: selectedPackage.name,
+            providerPrice: selectedPackage.providerPrice,
+            defaultMargin: pricing.cable,
+        });
 
         if (wallet.balance < amountToCharge) {
             return res.status(400).json({
@@ -714,8 +795,15 @@ exports.purchaseEducation = async (req, res) => {
         |--------------------------------------------------------------------------
         */
 
-        // Price already contains your configured profit
-        const amountToCharge = Number(product.price);
+        // Always charge the admin's current price for this product.
+        const amountToCharge = await resolveSellingPrice({
+            category: "education",
+            provider: product.service,
+            productCode: product.code,
+            productName: product.name,
+            providerPrice: product.providerPrice,
+            defaultMargin: pricing.education,
+        });
 
         if (wallet.balance < amountToCharge) {
             return res.status(400).json({
@@ -843,6 +931,15 @@ exports.getDataPlans = async (req, res) => {
             req.params.network
         );
 
+        await applyPriceOverrides("data", plans, {
+            codeOf: (p) => p.id,
+            providerOf: (p) => p.network,
+            providerPriceOf: (p) => p.providerPrice,
+            nameOf: (p) => p.name,
+            priceKeySet: (p, v) => { p.price = v; },
+            defaultMargin: pricing.data,
+        });
+
         return res.json({
             success: true,
             data: plans,
@@ -864,6 +961,15 @@ exports.getCablePackages = async (req, res) => {
         const packages = await subAndGain.getCablePackages(
             req.params.service
         );
+
+        await applyPriceOverrides("cable", packages, {
+            codeOf: (p) => p.code,
+            providerOf: (p) => p.service,
+            providerPriceOf: (p) => p.providerPrice,
+            nameOf: (p) => p.name,
+            priceKeySet: (p, v) => { p.price = v; },
+            defaultMargin: pricing.cable,
+        });
 
         return res.json({
             success: true,
@@ -947,6 +1053,15 @@ exports.getEducationProducts = async (req, res) => {
     try {
 
         const products = await subAndGain.getEducationProducts();
+
+        await applyPriceOverrides("education", products, {
+            codeOf: (p) => p.code,
+            providerOf: (p) => p.service,
+            providerPriceOf: (p) => p.providerPrice,
+            nameOf: (p) => p.name,
+            priceKeySet: (p, v) => { p.price = v; },
+            defaultMargin: pricing.education,
+        });
 
         return res.json({
             success: true,
