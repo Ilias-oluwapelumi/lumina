@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const routes = require('./routes');
+const logger = require('./utils/logger');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -95,17 +96,18 @@ app.use((req, res) => {
 
 // ─── ERROR HANDLER ────────────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
-  console.error('❌ Error:', err);
+  logger.error('Unhandled error:', err);
+  const isProd = process.env.NODE_ENV === 'production';
   res.status(err.status || 500).json({
     success: false,
-    message: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
+    message: err.expose || !isProd ? err.message : 'Internal server error',
   });
 });
 
 app.listen(PORT, () => {
-  console.log(`\n🌟 Lumina API running on http://localhost:${PORT}`);
-  console.log(`📋 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}\n`);
+  logger.info(`Lumina API running on http://localhost:${PORT}`);
+  logger.info(`Health check: http://localhost:${PORT}/health`);
+  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
 module.exports = app;

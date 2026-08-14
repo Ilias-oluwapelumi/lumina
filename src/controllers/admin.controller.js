@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { sendServerError } = require('../utils/errors');
 const db = require('../config/db');
 const { ADMIN_JWT_SECRET } = require('../middleware/admin_auth');
 
@@ -31,7 +32,7 @@ exports.login = async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'login' });
   }
 };
 
@@ -66,7 +67,7 @@ exports.changePassword = async (req, res) => {
     await db.changeAdminPassword(req.admin.email, newPassword);
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'changePassword' });
   }
 };
 
@@ -77,7 +78,7 @@ exports.getAdmins = async (req, res) => {
     const admins = await db.listAdmins();
     res.json({ success: true, data: { admins } });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'getAdmins' });
   }
 };
 
@@ -133,7 +134,7 @@ exports.getDashboard = async (req, res) => {
     const stats = await db.getDashboardStats();
     res.json({ success: true, data: stats });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'getDashboard' });
   }
 };
 
@@ -144,7 +145,7 @@ exports.getUsers = async (req, res) => {
     const result = await db.searchUsers({ query, page: parseInt(page), limit: parseInt(limit) });
     res.json({ success: true, data: result });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'getUsers' });
   }
 };
 
@@ -158,7 +159,7 @@ exports.getUserDetail = async (req, res) => {
     const { passwordHash, transactionPin, ...safeUser } = user;
     res.json({ success: true, data: { user: safeUser, wallet, transactions } });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'getUserDetail' });
   }
 };
 
@@ -205,7 +206,7 @@ exports.getTransactions = async (req, res) => {
     });
     res.json({ success: true, data: result });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'getTransactions' });
   }
 };
 
@@ -215,7 +216,7 @@ exports.getPricing = async (req, res) => {
     const prices = await db.getAllProductPrices(req.params.category);
     res.json({ success: true, data: prices });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'getPricing' });
   }
 };
 
@@ -249,7 +250,7 @@ exports.broadcast = async (req, res) => {
     const result = await db.broadcastNotification({ title, message, icon });
     res.json({ success: true, message: 'Broadcast sent', data: result });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'broadcast' });
   }
 };
 
@@ -259,7 +260,7 @@ exports.getNotificationSettings = async (req, res) => {
     const settings = await db.getNotificationSettings();
     res.json({ success: true, data: settings });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'getNotificationSettings' });
   }
 };
 

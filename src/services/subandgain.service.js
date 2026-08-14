@@ -1,10 +1,17 @@
 const axios = require("axios");
+const logger = require("../utils/logger");
 const pricing = require("../config/pricing");
 
 const api = axios.create({
     baseURL: process.env.SUBANDGAIN_BASE_URL,
     timeout: 30000,
 });
+
+function throwSafe(message) {
+    const error = new Error(message);
+    error.expose = true;
+    throw error;
+}
 
 const username = process.env.SUBANDGAIN_USERNAME;
 const apiKey = process.env.SUBANDGAIN_API_KEY;
@@ -32,11 +39,7 @@ async function request(endpoint, params = {}) {
 
     try {
 
-        console.log("==================================");
-        console.log("SUBANDGAIN REQUEST");
-        console.log(endpoint);
-        console.log(params);
-        console.log("==================================");
+        logger.debug("SubAndGain request:", endpoint, params);
 
         const { data } = await api.get(endpoint, {
             params: {
@@ -46,13 +49,10 @@ async function request(endpoint, params = {}) {
             },
         });
 
-        console.log("==================================");
-        console.log("SUBANDGAIN RESPONSE");
-        console.log(data);
-        console.log("==================================");
+        logger.debug("SubAndGain response:", data);
 
         if (data.error) {
-            throw new Error(
+            throwSafe(
                 data.description ||
                 data.error ||
                 "SubAndGain Error"
@@ -65,7 +65,7 @@ async function request(endpoint, params = {}) {
 
         if (err.response?.data) {
 
-            throw new Error(
+            throwSafe(
                 err.response.data.description ||
                 err.response.data.error ||
                 "SubAndGain Error"
@@ -73,7 +73,7 @@ async function request(endpoint, params = {}) {
 
         }
 
-        throw new Error(err.message);
+        throwSafe(err.message);
     }
 
 }
@@ -93,7 +93,7 @@ async function buyAirtime({
     const apiNetwork = NETWORKS[network];
 
     if (!apiNetwork) {
-        throw new Error("Unsupported Network");
+        throwSafe("Unsupported Network");
     }
 
     return request("/airtime.php", {
@@ -134,15 +134,10 @@ async function buyData({
     const apiNetwork = NETWORKS[network];
 
     if (!apiNetwork) {
-        throw new Error("Unsupported Network");
+        throwSafe("Unsupported Network");
     }
 
-    console.log("SENDING TO SUBANDGAIN");
-    console.log({
-        network: apiNetwork,
-        dataPlan,
-        phoneNumber: phone,
-    });
+    logger.debug("SubAndGain buyData request:", { network: apiNetwork, dataPlan, phoneNumber: phone });
 
     return request("/data.php", {
         network: apiNetwork,
@@ -177,7 +172,7 @@ async function getDataPlans(network) {
     const apiNetwork = NETWORKS[network];
 
     if (!apiNetwork) {
-        throw new Error("Unsupported Network");
+        throwSafe("Unsupported Network");
     }
 
     const bundles = await request("/databundles.php");
@@ -187,7 +182,7 @@ async function getDataPlans(network) {
     );
 
     if (!networkData) {
-        throw new Error("Network not found");
+        throwSafe("Network not found");
     }
 
     return networkData.BUNDLE.map(plan => {
@@ -250,7 +245,7 @@ async function verifyCable({
     const apiService = CABLE_SERVICES[service];
 
     if (!apiService) {
-        throw new Error("Unsupported Cable Provider");
+        throwSafe("Unsupported Cable Provider");
     }
 
     return request("/verify_bills.php", {
@@ -275,7 +270,7 @@ async function buyCable({
     const apiService = CABLE_SERVICES[service];
 
     if (!apiService) {
-        throw new Error("Unsupported Cable Provider");
+        throwSafe("Unsupported Cable Provider");
     }
 
     return request("/bills.php", {
@@ -311,7 +306,7 @@ async function getCablePackages(service) {
     const apiService = CABLE_SERVICES[service];
 
     if (!apiService) {
-        throw new Error("Unsupported Cable Provider");
+        throwSafe("Unsupported Cable Provider");
     }
 
     const bundles = await request("/cablebundles.php");
@@ -321,7 +316,7 @@ async function getCablePackages(service) {
     );
 
     if (!provider) {
-        throw new Error("Cable Provider not found");
+        throwSafe("Cable Provider not found");
     }
 
     return provider.BUNDLE
@@ -379,7 +374,7 @@ async function verifyElectricity({
     const apiService = DISCOS[service];
 
     if (!apiService) {
-        throw new Error("Unsupported Disco");
+        throwSafe("Unsupported Disco");
     }
 
     return request("/verify_electricity.php", {
@@ -401,7 +396,7 @@ async function payElectricity({
     const apiService = DISCOS[service];
 
     if (!apiService) {
-        throw new Error("Unsupported Disco");
+        throwSafe("Unsupported Disco");
     }
 
     return request("/electricity.php", {

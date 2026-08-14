@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { sendServerError } = require('../utils/errors');
 
 // GET /api/transactions
 exports.getTransactions = async (req, res) => {
@@ -11,7 +12,7 @@ exports.getTransactions = async (req, res) => {
     });
     res.json({ success: true, data: result });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'getTransactions' });
   }
 };
 
@@ -24,6 +25,6 @@ exports.getTransaction = async (req, res) => {
     }
     res.json({ success: true, data: { transaction: txn } });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'getTransaction' });
   }
 };

@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const db = require('../config/db');
+const { sendServerError } = require('../utils/errors');
 
 module.exports = async (req, res, next) => {
     try {
@@ -57,12 +58,7 @@ module.exports = async (req, res, next) => {
 
     } catch (err) {
 
-        console.error(err);
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
+        return sendServerError(res, err, { context: 'verifyTransactionPin' });
 
     }
 };

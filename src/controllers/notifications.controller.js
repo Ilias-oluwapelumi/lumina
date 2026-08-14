@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { sendServerError } = require('../utils/errors');
 
 // GET /api/notifications
 exports.getNotifications = async (req, res) => {
@@ -10,7 +11,7 @@ exports.getNotifications = async (req, res) => {
     });
     res.json({ success: true, data: result });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'getNotifications' });
   }
 };
 
@@ -20,7 +21,7 @@ exports.getUnreadCount = async (req, res) => {
     const count = await db.getUnreadNotificationCount(req.user.id);
     res.json({ success: true, data: { count } });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'getUnreadCount' });
   }
 };
 
@@ -33,7 +34,7 @@ exports.markRead = async (req, res) => {
     }
     res.json({ success: true, data: { notification } });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'markRead' });
   }
 };
 
@@ -43,6 +44,6 @@ exports.markAllRead = async (req, res) => {
     await db.markAllNotificationsRead(req.user.id);
     res.json({ success: true, message: 'All notifications marked as read' });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'markAllRead' });
   }
 };

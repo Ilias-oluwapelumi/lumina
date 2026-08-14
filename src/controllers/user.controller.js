@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { sendServerError } = require('../utils/errors');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 
@@ -11,7 +12,7 @@ exports.getProfile = async (req, res) => {
     const { passwordHash, ...safeUser } = req.user;
     res.json({ success: true, data: { user: { ...safeUser, wallet } } });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'getProfile' });
   }
 };
 
@@ -52,7 +53,7 @@ exports.changePassword = async (req, res) => {
     );
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'changePassword' });
   }
 };
 
@@ -72,7 +73,7 @@ exports.getDashboardSummary = async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'getDashboardSummary' });
   }
 };
 
@@ -83,12 +84,6 @@ exports.setPin = async (req, res) => {
     try {
 
         const { pin } = req.body;
-        // ─── 🔍 INVESTIGATE THE AUTH TOKEN CONTENT ────────────────
-        console.log("=========================================");
-        console.log("👉 Full req.user object received:", req.user);
-        console.log("👉 req.user.id value:", req.user?.id);
-        console.log("👉 req.user._id value:", req.user?._id);
-        console.log("=========================================");
 
         if (!pin) {
             return res.status(400).json({
@@ -103,8 +98,6 @@ exports.setPin = async (req, res) => {
                 message: 'PIN must be exactly 4 digits'
             });
         }
-        console.log("req.user.id =", req.user.id);
-console.log("req.user._id =", req.user._id);
 
         const pinData = await db.getTransactionPin(req.user);
 
@@ -135,12 +128,7 @@ console.log("req.user._id =", req.user._id);
 
     } catch (err) {
 
-        console.error(err);
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
+        return sendServerError(res, err, { context: 'setPin' });
 
     }
 };
@@ -210,12 +198,7 @@ exports.changePin = async (req, res) => {
 
     } catch (err) {
 
-        console.error(err);
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
+        return sendServerError(res, err, { context: 'changePin' });
 
     }
 
@@ -277,12 +260,7 @@ exports.verifyPin = async (req, res) => {
 
     } catch (err) {
 
-        console.error(err);
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
+        return sendServerError(res, err, { context: 'verifyPin' });
 
     }
 };
@@ -309,7 +287,7 @@ exports.getNotificationPreferences = async (req, res) => {
             },
         });
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message });
+        return sendServerError(res, err, { context: 'getNotificationPreferences' });
     }
 };
 
@@ -347,6 +325,6 @@ exports.updateNotificationPreferences = async (req, res) => {
             data: { myPreferences: updated },
         });
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message });
+        return sendServerError(res, err, { context: 'updateNotificationPreferences' });
     }
 };

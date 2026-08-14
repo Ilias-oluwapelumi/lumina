@@ -1,6 +1,8 @@
 const db = require("../config/db");
 const pricing = require("../config/pricing");
 const subAndGain = require("../services/subandgain.service");
+const logger = require("../utils/logger");
+const { sendServerError } = require("../utils/errors");
 
 /*
 |--------------------------------------------------------------------------
@@ -27,7 +29,7 @@ async function resolveSellingPrice({
     await db.updateProductPrice({
         category, provider, productCode: code,
         productName, buyingPrice: Number(providerPrice || 0), sellingPrice,
-    }).catch((err) => console.error("Failed to seed product price:", err.message));
+    }).catch((err) => logger.error("Failed to seed product price:", err.message));
 
     return sellingPrice;
 }
@@ -61,7 +63,7 @@ async function applyPriceOverrides(category, items, {
 
     for (const p of toSeed) {
         await db.updateProductPrice(p).catch((err) =>
-            console.error("Failed to seed product price:", err.message));
+            logger.error("Failed to seed product price:", err.message));
     }
 
     return items;
@@ -75,7 +77,6 @@ async function applyPriceOverrides(category, items, {
 
 // POST /api/services/airtime
 exports.buyAirtime = async (req, res) => {
-    console.log("===== BUY AIRTIME CONTROLLER HIT =====");
 
     try {
 
@@ -119,7 +120,7 @@ exports.buyAirtime = async (req, res) => {
             amount: providerAmount,
         });
 
-        console.log(response);
+        logger.debug("SubAndGain response:", response);
 
         if (
             response.status !== "Approved" &&
@@ -179,12 +180,7 @@ exports.buyAirtime = async (req, res) => {
 
     } catch (err) {
 
-        console.error(err);
-
-        return res.status(500).json({
-            success: false,
-            message: err.message,
-        });
+        return sendServerError(res, err, { context: 'buyAirtime' });
 
     }
 };
@@ -196,7 +192,6 @@ exports.buyAirtime = async (req, res) => {
 
 // POST /api/services/data
 exports.buyData = async (req, res) => {
-    console.log("===== BUY DATA CONTROLLER HIT =====");
 
     try {
 
@@ -222,10 +217,6 @@ exports.buyData = async (req, res) => {
                 message: "Wallet not found",
             });
         }
-
-        console.log("NETWORK =", network);
-        console.log("DATAPLAN =", dataPlan);
-        console.log("PHONE =", phone);
 
         /*
         |--------------------------------------------------------------------------
@@ -277,8 +268,7 @@ exports.buyData = async (req, res) => {
             dataPlan,
         });
 
-        console.log("FULL SUBANDGAIN DATA RESPONSE");
-        console.log(response);
+        logger.debug("SubAndGain response:", response);
 
         if (response.error) {
             return res.status(400).json({
@@ -358,12 +348,7 @@ exports.buyData = async (req, res) => {
 
     } catch (err) {
 
-        console.error(err);
-
-        return res.status(500).json({
-            success: false,
-            message: err.message,
-        });
+        return sendServerError(res, err, { context: 'buyData' });
 
     }
 };
@@ -375,8 +360,6 @@ exports.buyData = async (req, res) => {
 
 // POST /api/services/cable
 exports.buyCable = async (req, res) => {
-
-    console.log("===== BUY CABLE CONTROLLER HIT =====");
 
     try {
 
@@ -462,8 +445,7 @@ exports.buyCable = async (req, res) => {
             smartNumber,
         });
 
-        console.log("FULL SUBANDGAIN CABLE RESPONSE");
-        console.log(response);
+        logger.debug("SubAndGain response:", response);
 
         if (response.error) {
             return res.status(400).json({
@@ -549,12 +531,7 @@ exports.buyCable = async (req, res) => {
 
     } catch (err) {
 
-        console.error(err);
-
-        return res.status(500).json({
-            success: false,
-            message: err.message,
-        });
+        return sendServerError(res, err, { context: 'buyCable' });
 
     }
 
@@ -566,8 +543,6 @@ exports.buyCable = async (req, res) => {
 
 // POST /api/services/electricity
 exports.payElectricity = async (req, res) => {
-
-    console.log("===== BUY ELECTRICITY CONTROLLER HIT =====");
 
     try {
 
@@ -636,7 +611,7 @@ exports.payElectricity = async (req, res) => {
             amount,
         });
 
-        console.log(response);
+        logger.debug("SubAndGain response:", response);
 
         if (response.error) {
             return res.status(400).json({
@@ -724,12 +699,7 @@ exports.payElectricity = async (req, res) => {
 
     } catch (err) {
 
-        console.error(err);
-
-        return res.status(500).json({
-            success: false,
-            message: err.message,
-        });
+        return sendServerError(res, err, { context: 'payElectricity' });
 
     }
 };
@@ -741,8 +711,6 @@ exports.payElectricity = async (req, res) => {
 
 // POST /api/services/education
 exports.purchaseEducation = async (req, res) => {
-
-    console.log("===== BUY EDUCATION CONTROLLER HIT =====");
 
     try {
 
@@ -827,7 +795,7 @@ exports.purchaseEducation = async (req, res) => {
             eduCode: product.code,
         });
 
-        console.log(response);
+        logger.debug("SubAndGain response:", response);
 
         if (response.error) {
             return res.status(400).json({
@@ -913,12 +881,7 @@ exports.purchaseEducation = async (req, res) => {
 
     } catch (err) {
 
-        console.error(err);
-
-        return res.status(500).json({
-            success: false,
-            message: err.message,
-        });
+        return sendServerError(res, err, { context: 'purchaseEducation' });
 
     }
 

@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { sendServerError } = require('../utils/errors');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db');
 
@@ -92,7 +93,7 @@ exports.login = async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'login' });
   }
 };
 

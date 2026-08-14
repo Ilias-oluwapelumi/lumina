@@ -1,4 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
+const { sendServerError } = require('../utils/errors');
+const logger = require('../utils/logger');
 const db = require('../config/db');
 const monnify = require('../services/monnify.service');
 
@@ -9,7 +11,7 @@ exports.getWallet = async (req, res) => {
     if (!wallet) return res.status(404).json({ success: false, message: 'Wallet not found' });
     res.json({ success: true, data: { wallet } });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    sendServerError(res, err, { context: 'getWallet' });
   }
 };
 
@@ -76,7 +78,7 @@ exports.initializeFunding = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
+    logger.error('initializeFunding failed:', err);
     res.status(400).json({ success: false, message: err.message });
   }
 };
@@ -125,7 +127,7 @@ exports.monnifyWebhook = async (req, res) => {
     const rawBody = req.body; // Buffer — see index.js wiring
 
     if (!monnify.verifyWebhookSignature(rawBody, signature)) {
-      console.warn('Rejected Monnify webhook: invalid signature');
+      logger.warn('Rejected Monnify webhook: invalid signature');
       return res.status(401).json({ success: false });
     }
 
@@ -142,7 +144,7 @@ exports.monnifyWebhook = async (req, res) => {
     const amountPaid = eventData?.amountPaid;
 
     if (!accountReference || !paymentReference || !amountPaid) {
-      console.warn('Monnify webhook missing expected fields', eventData);
+      logger.warn('Monnify webhook missing expected fields', eventData);
       return res.status(200).json({ success: true });
     }
 
@@ -154,7 +156,7 @@ exports.monnifyWebhook = async (req, res) => {
     }
 
     if (!accountReference.startsWith('WALLET-')) {
-      console.warn('Unrecognized Monnify account reference:', accountReference);
+      logger.warn('Unrecognized Monnify account reference:', accountReference);
       return res.status(200).json({ success: true });
     }
 
@@ -185,7 +187,7 @@ exports.monnifyWebhook = async (req, res) => {
 
     return res.status(200).json({ success: true });
   } catch (err) {
-    console.error('Monnify webhook error:', err);
+    logger.error('Monnify webhook error:', err);
     // Return 200 even on our own bug so Monnify doesn't hammer retries —
     // but this is logged loudly above so you catch it. Switch to 500 once
     // this has been running cleanly for a while if you'd rather it retry.

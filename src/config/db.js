@@ -1,11 +1,12 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
+const logger = require('../utils/logger');
 
 // ─── CONNECT TO MONGODB ──────────────────────────────────────────────────────
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('✅ MongoDB connected'))
-  .catch(err => console.error('❌ MongoDB connection error:', err));
+  .then(() => logger.info('MongoDB connected'))
+  .catch(err => logger.error('MongoDB connection error:', err));
 
 // ─── SCHEMAS ─────────────────────────────────────────────────────────────────
 const userSchema = new mongoose.Schema({
@@ -165,7 +166,7 @@ async function seed() {
     { id: uuidv4(), userId: id, type: 'credit', category: 'fund',        title: 'Wallet Funding',      amount: 100000, status: 'successful', icon: 'account_balance', date: new Date('2024-10-19T16:00:00Z').toISOString(), reference: 'TXN006' },
     { id: uuidv4(), userId: id, type: 'debit',  category: 'data',        title: 'Data – MTN 5GB',      amount: 1500,   status: 'successful', icon: 'wifi',            date: new Date('2024-10-18T09:00:00Z').toISOString(), reference: 'TXN007' },
   ]);
-  console.log('✅ Demo DB seeded — phone: 08012345678 | password: password123');
+  logger.info('Demo DB seeded (dev only — see seed() for credentials)');
 }
 
 mongoose.connection.once('open', seed);
@@ -179,7 +180,7 @@ async function seedAdmin() {
     id: uuidv4(), fullName: 'Lumina Super Admin', email: 'admin@lumina.ng',
     passwordHash, role: 'superadmin',
   });
-  console.log('✅ Default admin seeded — email: admin@lumina.ng | password: Admin@12345');
+  logger.warn('Default admin seeded with the documented placeholder password — change it immediately after first login.');
 }
 
 mongoose.connection.once('open', seedAdmin);
@@ -259,12 +260,7 @@ const db = {
 
  setTransactionPin: async (id, pinHash) => {
     const filter = getFilter(id);
-
-    console.log("FILTER =", filter);
-
     const user = await User.findOne(filter);
-
-    console.log("FOUND USER =", user);
 
     if (!user) {
         throw new Error("User not found");
