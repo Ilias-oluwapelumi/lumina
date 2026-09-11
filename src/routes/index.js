@@ -12,6 +12,7 @@ const txnCtrl = require("../controllers/transactions.controller");
 const userCtrl = require("../controllers/user.controller");
 const notificationsCtrl = require("../controllers/notifications.controller");
 const adminCtrl = require("../controllers/admin.controller");
+const webhookCtrl = require("../controllers/webhook.controller");
 
 /*
 |--------------------------------------------------------------------------
