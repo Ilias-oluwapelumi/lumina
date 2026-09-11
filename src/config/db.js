@@ -42,6 +42,13 @@ const userSchema = new mongoose.Schema({
     promotions: { type: Boolean, default: true },
   },
   createdAt: { type: String, default: () => new Date().toISOString() },
+  virtualAccount: {  // ← ADD THIS
+    accountNumber: String,
+    bankName: String,
+    accountName: String,
+    refId: String,
+    createdAt: Date,
+  },
 });
 
 const walletSchema = new mongoose.Schema({
@@ -606,6 +613,19 @@ updateProductPrice: async ({
     if (!result.matchedCount) throw new Error('User not found');
     return result;
   },
+
+  setVirtualAccount: async (id, accountData) => {
+  const user = await User.findOne({ id });
+  if (!user) throw new Error('User not found');
+  user.virtualAccount = accountData;
+  await user.save();
+  return user;
+},
+
+getVirtualAccount: async (id) => {
+  const user = await User.findOne({ id }).lean();
+  return user?.virtualAccount || null;
+},
 
   searchTransactions: async ({ query, status, category, page = 1, limit = 20 } = {}) => {
     const filter = {};
