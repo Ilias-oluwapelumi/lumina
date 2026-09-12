@@ -28,7 +28,7 @@ async function createVirtualAccount({
 
     const { data } = await axios({
       method: 'POST',
-      url: 'https://heedpay.com.ng/api/create-virtual-account',
+      url: 'https://heedpay.com.ng/api',
       data: payload,
       headers: {
         'Authorization': apiKey,
