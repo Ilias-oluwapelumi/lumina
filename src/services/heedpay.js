@@ -1,9 +1,5 @@
 const axios = require('axios');
 
-const api = axios.create({
-  baseURL: 'https://heedpay.com.ng/api',
-});
-
 async function createVirtualAccount({
   refId,
   email,
@@ -15,10 +11,8 @@ async function createVirtualAccount({
 }) {
   try {
     console.log('=== HeedPay Debug ===');
-    console.log('API Key:', apiKey?.substring(0, 10) + '...');
+    console.log('API Key:', apiKey?.substring(0, 20) + '...');
     console.log('RefId:', refId);
-    console.log('RefId Length:', refId.length);
-    console.log('RefId starts with YYYYMMDD:', /^\d{8}/.test(refId));
     
     const payload = {
       refId,
@@ -34,13 +28,19 @@ async function createVirtualAccount({
 
     console.log('Payload:', JSON.stringify(payload, null, 2));
 
-    const { data } = await api.post('/create-virtual-account', payload, {
+    // Create fresh axios instance with full config
+    const api = axios.create({
+      baseURL: 'https://heedpay.com.ng/api',
+      timeout: 30000,
       headers: {
         'Authorization': apiKey,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
     });
+
+    const response = await api.post('/create-virtual-account', payload);
+    const data = response.data;
 
     console.log('HeedPay Response:', JSON.stringify(data, null, 2));
 
@@ -49,8 +49,9 @@ async function createVirtualAccount({
     }
     throw new Error(data.message || 'Failed to create virtual account');
   } catch (err) {
-    console.error('HeedPay Error Status:', err.response?.status);
-    console.error('HeedPay Error Data:', JSON.stringify(err.response?.data, null, 2));
+    console.error('HeedPay Status:', err.response?.status);
+    console.error('HeedPay Headers Sent:', err.config?.headers);
+    console.error('HeedPay Error:', JSON.stringify(err.response?.data, null, 2));
     throw new Error(err.response?.data?.message || err.message);
   }
 }
