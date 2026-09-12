@@ -14,9 +14,13 @@ async function createVirtualAccount({
   apiKey,
 }) {
   try {
-    console.log('Creating Virtual Account with HeedPay...');
+    console.log('=== HeedPay Debug ===');
+    console.log('API Key:', apiKey?.substring(0, 10) + '...');
+    console.log('RefId:', refId);
+    console.log('RefId Length:', refId.length);
+    console.log('RefId starts with YYYYMMDD:', /^\d{8}/.test(refId));
     
-    const { data } = await api.post('/create-virtual-account', {
+    const payload = {
       refId,
       email,
       account_name: accountName,
@@ -26,7 +30,11 @@ async function createVirtualAccount({
       account_type: 'STATIC',
       bankCode: 'palmpay',
       businessId,
-    }, {
+    };
+
+    console.log('Payload:', JSON.stringify(payload, null, 2));
+
+    const { data } = await api.post('/create-virtual-account', payload, {
       headers: {
         'Authorization': apiKey,
         'Content-Type': 'application/json',
@@ -34,14 +42,15 @@ async function createVirtualAccount({
       },
     });
 
-    console.log('HeedPay Response:', JSON.stringify(data));
+    console.log('HeedPay Response:', JSON.stringify(data, null, 2));
 
     if (data.status === 'success') {
       return data.data;
     }
     throw new Error(data.message || 'Failed to create virtual account');
   } catch (err) {
-    console.error('HeedPay Error:', err.response?.data || err.message);
+    console.error('HeedPay Error Status:', err.response?.status);
+    console.error('HeedPay Error Data:', JSON.stringify(err.response?.data, null, 2));
     throw new Error(err.response?.data?.message || err.message);
   }
 }
