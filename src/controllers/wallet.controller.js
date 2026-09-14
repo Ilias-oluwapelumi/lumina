@@ -18,7 +18,7 @@ exports.initializeFunding = async (req, res) => {
       const refId = `${new Date().toISOString().slice(0, 10).replace(/-/g, '')}${user.id.slice(0, 8).toUpperCase()}`;
 
       // Use BVN from environment or user profile
-      const bvn = process.env.TEST_BVN || '22345678901';
+      const bvn = process.env.TEST_BVN || '22499489618';
 
       const accountData = await heedpay.createVirtualAccount({
         refId,
