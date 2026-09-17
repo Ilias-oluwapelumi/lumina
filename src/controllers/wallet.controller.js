@@ -18,7 +18,7 @@ exports.initializeFunding = async (req, res) => {
       const refId = `${new Date().toISOString().slice(0, 10).replace(/-/g, '')}${user.id.slice(0, 8).toUpperCase()}`;
 
       // Use BVN from environment or user profile
-      const bvn = process.env.TEST_BVN || '22499489618';
+      const bvn = process.env.TEST_BVN || '';
 
       const accountData = await heedpay.createVirtualAccount({
         refId,
@@ -27,7 +27,7 @@ exports.initializeFunding = async (req, res) => {
         phoneNumber: user.phone,
         bvn,
         businessId: process.env.HEEDPAY_BUSINESS_ID,
-        apiKey: process.env.HEEDPAY_API_KEY,
+        apiKey: process.env.HEEDPAY_PUBLIC_KEY,
       });
 
       // Save to database
