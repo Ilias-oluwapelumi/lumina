@@ -1,5 +1,9 @@
 const axios = require('axios');
 
+/**
+ * Helper function to generate a valid refId 
+ * Rule: Must start with YYYYMMDD and be 12-30 characters
+ */
 function generateRefId() {
     const now = new Date();
     const year = now.getFullYear();
@@ -15,6 +19,9 @@ function generateRefId() {
     return datePrefix + randomPart;
 }
 
+/**
+ * Provision Static Virtual Account
+ */
 async function createVirtualAccount({
   email,
   accountName,
@@ -28,13 +35,11 @@ async function createVirtualAccount({
   try {
     const refId = generateRefId();
 
-    // Clean the key and ensure it starts precisely with 'heedpay'
-    const cleanKey = apiKey ? apiKey.trim() : '';
-    const authHeader = cleanKey.startsWith('heedpay') ? cleanKey : `heedpay${cleanKey}`;
-
     console.log('=== HeedPay Static Account Request ===');
     console.log('URL: https://heedpay.com.ng/api/create-virtual-account');
-    console.log('Auth Header Preview:', authHeader.substring(0, 20) + '...');
+
+    // Ensure apiKey is clean and passed directly as configured in your dashboard/env
+    const authHeader = apiKey ? apiKey.trim() : '';
 
     const payload = {
       refId: refId,
@@ -43,19 +48,19 @@ async function createVirtualAccount({
       phone_number: phoneNumber,
       identityType: identityType,
       identityNumber: identityNumber,
-      account_type: 'STATIC',
-      bankCode: bankCode,
-      businessId: businessId,
+      account_type: 'STATIC', //
+      bankCode: bankCode,     //
+      businessId: businessId, //
     };
 
     const { data } = await axios.post(
-      'https://heedpay.com.ng/api/create-virtual-account',
+      'https://heedpay.com.ng/api/create-virtual-account', //
       payload,
       {
         headers: {
-          'Authorization': authHeader,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          'Authorization': authHeader, //
+          'Content-Type': 'application/json', //
+          'Accept': 'application/json',       //
         },
         timeout: 30000,
       }
@@ -64,7 +69,7 @@ async function createVirtualAccount({
     console.log('Response:', JSON.stringify(data));
     
     if (data.status === 'success') {
-      return data.data; // Returning the nested data object containing virtualNumber/bankName
+      return data.data; // Returns the inner data object containing virtualNumber, bankName, etc.
     }
     throw new Error(data.message || 'Failed to create static virtual account');
   } catch (err) {

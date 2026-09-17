@@ -24,9 +24,11 @@ exports.initializeFunding = async (req, res) => {
         email: user.email,
         accountName: user.fullName,
         phoneNumber: user.phone,
-        bvn,
+        identityType: 'bvn',
+        identityNumber: bvn,
+        bankCode: 'palmpay',
         businessId: process.env.HEEDPAY_BUSINESS_ID,
-        apiKey: process.env.HEEDPAY_API_KEY, // <-- FIXED: Use HEEDPAY_API_KEY here
+        apiKey: process.env.HEEDPAY_API_KEY, // Switch to HEEDPAY_PUBLIC_KEY if your public key is what HeedPay requires
       });
 
       // Save to database
