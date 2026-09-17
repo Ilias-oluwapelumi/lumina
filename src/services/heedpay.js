@@ -1,29 +1,53 @@
 const axios = require('axios');
 
-async function createVirtualAccount({
-  refId,
+/**
+ * Helper function to generate a valid refId 
+ * Rule: Must start with YYYYMMDD and be 12-30 characters
+ */
+function generateRefId() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const datePrefix = `${year}${month}${day}`;
+
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let randomPart = '';
+    for (let i = 0; i < 12; i++) {
+        randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return datePrefix + randomPart;
+}
+
+/**
+ * Provision Static Virtual Account
+ */
+async function createStaticVirtualAccount({
   email,
   accountName,
   phoneNumber,
-  bvn,
+  identityType = 'bvn', // Supported values: "bvn" or "nin"
+  identityNumber,
+  bankCode = 'palmpay', // Target clearing institute routing code
   businessId,
   apiKey,
 }) {
   try {
-    console.log('=== HeedPay Request ===');
-    console.log('API Key (first 20):', apiKey?.substring(0, 20));
+    const refId = generateRefId();
+
+    console.log('=== HeedPay Static Account Request ===');
     console.log('URL: https://heedpay.com.ng/api/create-virtual-account');
-    
+
     const payload = {
-      refId,
-      email,
+      refId: refId,
+      email: email,
       account_name: accountName,
       phone_number: phoneNumber,
-      identityType: 'bvn',
-      identityNumber: bvn,
+      identityType: identityType,
+      identityNumber: identityNumber,
       account_type: 'STATIC',
-      bankCode: 'palmpay',
-      businessId,
+      bankCode: bankCode,
+      businessId: businessId,
     };
 
     const { data } = await axios.post(
@@ -31,8 +55,8 @@ async function createVirtualAccount({
       payload,
       {
         headers: {
-          // Added 'Bearer ' prefix to fix "Invalid Access Token"
-          'Authorization': apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`,
+          // Based on HeedPay documentation header example (Authorization: heedpay...)
+          'Authorization': apiKey.startsWith('heedpay') ? apiKey : `heedpay${apiKey}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
@@ -41,10 +65,11 @@ async function createVirtualAccount({
     );
 
     console.log('Response:', JSON.stringify(data));
-    if (data.status === 'success' || data.status === true) {
-      return data.data;
+    
+    if (data.status === 'success') {
+      return data; // Contains virtualNumber, virtualName, bankName, etc. inside data object
     }
-    throw new Error(data.message || 'Failed');
+    throw new Error(data.message || 'Failed to create static virtual account');
   } catch (err) {
     console.error('Full Error:', err.message);
     console.error('Status:', err.response?.status);
@@ -53,4 +78,7 @@ async function createVirtualAccount({
   }
 }
 
-module.exports = { createVirtualAccount };
+module.exports = { 
+  generateRefId, 
+  createStaticVirtualAccount 
+};
