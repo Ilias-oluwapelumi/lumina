@@ -1,9 +1,5 @@
 const axios = require('axios');
 
-/**
- * Helper function to generate a valid refId 
- * Rule: Must start with YYYYMMDD and be 12-30 characters
- */
 function generateRefId() {
     const now = new Date();
     const year = now.getFullYear();
@@ -19,16 +15,14 @@ function generateRefId() {
     return datePrefix + randomPart;
 }
 
-/**
- * Provision Static Virtual Account
- */
-async function createStaticVirtualAccount({
+// Renamed from createStaticVirtualAccount to createVirtualAccount to match your controller
+async function createVirtualAccount({
   email,
   accountName,
   phoneNumber,
-  identityType = 'bvn', // Supported values: "bvn" or "nin"
+  identityType = 'bvn',
   identityNumber,
-  bankCode = 'palmpay', // Target clearing institute routing code
+  bankCode = 'palmpay',
   businessId,
   apiKey,
 }) {
@@ -55,7 +49,6 @@ async function createStaticVirtualAccount({
       payload,
       {
         headers: {
-          // Based on HeedPay documentation header example (Authorization: heedpay...)
           'Authorization': apiKey.startsWith('heedpay') ? apiKey : `heedpay${apiKey}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -67,7 +60,7 @@ async function createStaticVirtualAccount({
     console.log('Response:', JSON.stringify(data));
     
     if (data.status === 'success') {
-      return data; // Contains virtualNumber, virtualName, bankName, etc. inside data object
+      return data;
     }
     throw new Error(data.message || 'Failed to create static virtual account');
   } catch (err) {
@@ -78,7 +71,8 @@ async function createStaticVirtualAccount({
   }
 }
 
+// Export it properly so the controller can find it
 module.exports = { 
   generateRefId, 
-  createStaticVirtualAccount 
+  createVirtualAccount 
 };
