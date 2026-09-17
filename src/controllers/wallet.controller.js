@@ -4,7 +4,6 @@ const logger = require('../utils/logger');
 const db = require('../config/db');
 const heedpay = require('../services/heedpay');
 
-
 // POST /api/wallet/fund/initialize
 exports.initializeFunding = async (req, res) => {
   try {
@@ -27,7 +26,7 @@ exports.initializeFunding = async (req, res) => {
         phoneNumber: user.phone,
         bvn,
         businessId: process.env.HEEDPAY_BUSINESS_ID,
-        apiKey: process.env.HEEDPAY_PUBLIC_KEY,
+        apiKey: process.env.HEEDPAY_API_KEY, // <-- FIXED: Use HEEDPAY_API_KEY here
       });
 
       // Save to database

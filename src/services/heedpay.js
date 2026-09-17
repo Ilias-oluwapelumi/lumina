@@ -15,7 +15,6 @@ function generateRefId() {
     return datePrefix + randomPart;
 }
 
-// Renamed from createStaticVirtualAccount to createVirtualAccount to match your controller
 async function createVirtualAccount({
   email,
   accountName,
@@ -29,8 +28,13 @@ async function createVirtualAccount({
   try {
     const refId = generateRefId();
 
+    // Clean the key and ensure it starts precisely with 'heedpay'
+    const cleanKey = apiKey ? apiKey.trim() : '';
+    const authHeader = cleanKey.startsWith('heedpay') ? cleanKey : `heedpay${cleanKey}`;
+
     console.log('=== HeedPay Static Account Request ===');
     console.log('URL: https://heedpay.com.ng/api/create-virtual-account');
+    console.log('Auth Header Preview:', authHeader.substring(0, 20) + '...');
 
     const payload = {
       refId: refId,
@@ -49,7 +53,7 @@ async function createVirtualAccount({
       payload,
       {
         headers: {
-          'Authorization': apiKey.startsWith('heedpay') ? apiKey : `heedpay${apiKey}`,
+          'Authorization': authHeader,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
@@ -60,7 +64,7 @@ async function createVirtualAccount({
     console.log('Response:', JSON.stringify(data));
     
     if (data.status === 'success') {
-      return data;
+      return data.data; // Returning the nested data object containing virtualNumber/bankName
     }
     throw new Error(data.message || 'Failed to create static virtual account');
   } catch (err) {
@@ -71,7 +75,6 @@ async function createVirtualAccount({
   }
 }
 
-// Export it properly so the controller can find it
 module.exports = { 
   generateRefId, 
   createVirtualAccount 
