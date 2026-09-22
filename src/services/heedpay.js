@@ -30,14 +30,14 @@ function generateRefId() {
  * Provision Static Virtual Account
  */
 async function createVirtualAccount({
-    email,
-    accountName,
-    phoneNumber,
+    email = '',
+    accountName = '',
+    phoneNumber = '',
     identityType = 'bvn',
-    identityNumber,
+    identityNumber = '',
     bankCode = 'palmpay',
-    businessId,
-    apiKey,
+    businessId = '',
+    apiKey = '',
 }) {
     try {
         console.log('======================================');
@@ -45,35 +45,24 @@ async function createVirtualAccount({
         console.log('======================================');
 
         /**
-         * Clean API key
+         * Clean API key and parameters
          */
         const cleanKey = apiKey ? String(apiKey).trim() : '';
 
-        /**
-         * Stop if API key is missing
-         */
         if (!cleanKey) {
             throw new Error('HeedPay access token/API key is missing.');
         }
 
-        /**
-         * Stop if business ID is missing
-         */
         if (!businessId) {
             throw new Error('HeedPay businessId is missing.');
         }
 
         /**
          * Format Authorization header
-         *
-         * HeedPay's docs specify the RAW key with NO "Token " prefix:
-         *   Authorization: heedpay9g4efbt45hg0d553f297b703fb510dd46e3e5cc
-         *
-         * Sending "Token <key>" fails HeedPay's auth check, which comes
-         * back as a misleading "must be in JSON Format" error instead of
-         * a proper 401 — that was the actual cause of every failure.
          */
-        const formattedToken = cleanKey;
+        const formattedToken = cleanKey.startsWith('Token ')
+            ? cleanKey
+            : `Token ${cleanKey}`;
 
         /**
          * Generate reference ID
@@ -81,43 +70,46 @@ async function createVirtualAccount({
         const refId = generateRefId();
 
         /**
-         * Request payload object
+         * Construct JSON payload
+         * Explicitly fallback undefined values to empty strings to avoid invalid JSON output
          */
-        const payloadObject = {
-            refId: refId,
-            email: email,
-            account_name: accountName,
-            phone_number: phoneNumber,
-            identityType: identityType,
-            identityNumber: identityNumber,
+        const rawPayload = {
+            refId: String(refId),
+            email: String(email).trim(),
+            account_name: String(accountName).trim(),
+            phone_number: String(phoneNumber).trim(),
+            identityType: String(identityType).trim(),
+            identityNumber: String(identityNumber).trim(),
             account_type: 'STATIC',
-            bankCode: bankCode,
-            businessId: businessId,
+            bankCode: String(bankCode).trim(),
+            businessId: String(businessId).trim(),
         };
 
-        console.log('Request Payload:', payloadObject);
+        const jsonStringData = JSON.stringify(rawPayload);
+
+        console.log('Sending JSON String:', jsonStringData);
 
         /**
-         * Send request to HeedPay
-         * Passing 'payloadObject' directly as an Object (NOT a JSON string)
+         * Send request to HeedPay using Axios
          */
-        const { data } = await axios.post(
-            'https://heedpay.com.ng/api/create-virtual-account',
-            payloadObject,
-            {
-                headers: {
-                    'Authorization': formattedToken,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-                timeout: 30000,
-            }
-        );
+        const response = await axios({
+            method: 'post',
+            url: 'https://heedpay.com.ng/api/create-virtual-account',
+            data: jsonStringData,
+            headers: {
+                'Authorization': formattedToken,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            timeout: 30000,
+            transformRequest: [(data) => data], // Prevents Axios from altering the raw JSON string
+        });
+
+        const data = response.data;
 
         console.log('======================================');
         console.log('HEEDPAY RESPONSE');
         console.log('======================================');
-
         console.log('Response:', JSON.stringify(data, null, 2));
 
         if (data && data.status === 'success') {
