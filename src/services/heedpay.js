@@ -1,5 +1,3 @@
-const axios = require('axios');
-
 /**
  * Helper function to generate a valid refId
  * Rule: Must start with YYYYMMDD and be 12-30 characters
@@ -45,7 +43,7 @@ async function createVirtualAccount({
         console.log('======================================');
 
         /**
-         * Clean API key and parameters
+         * Clean API key and mandatory parameters
          */
         const cleanKey = apiKey ? String(apiKey).trim() : '';
 
@@ -70,8 +68,7 @@ async function createVirtualAccount({
         const refId = generateRefId();
 
         /**
-         * Construct JSON payload
-         * Explicitly fallback undefined values to empty strings to avoid invalid JSON output
+         * Construct JSON object and stringify payload
          */
         const rawPayload = {
             refId: String(refId),
@@ -85,59 +82,58 @@ async function createVirtualAccount({
             businessId: String(businessId).trim(),
         };
 
-        const jsonStringData = JSON.stringify(rawPayload);
+        const jsonBody = JSON.stringify(rawPayload);
 
-        console.log('Sending JSON String:', jsonStringData);
+        console.log('Sending JSON String:', jsonBody);
 
         /**
-         * Send request to HeedPay using Axios
+         * Send request to HeedPay using Native Fetch API
          */
-        const response = await axios({
-            method: 'post',
-            url: 'https://heedpay.com.ng/api/create-virtual-account',
-            data: jsonStringData,
+        const response = await fetch('https://heedpay.com.ng/api/create-virtual-account', {
+            method: 'POST',
             headers: {
                 'Authorization': formattedToken,
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
+                'User-Agent': 'NodeJS/Fetch-Client',
             },
-            timeout: 30000,
-            transformRequest: [(data) => data], // Prevents Axios from altering the raw JSON string
+            body: jsonBody,
         });
 
-        const data = response.data;
+        const responseText = await response.text();
 
         console.log('======================================');
-        console.log('HEEDPAY RESPONSE');
+        console.log('HEEDPAY RAW RESPONSE');
         console.log('======================================');
-        console.log('Response:', JSON.stringify(data, null, 2));
+        console.log('Raw Body:', responseText);
 
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            throw new Error(`Invalid non-JSON server response: ${responseText}`);
+        }
+
+        /**
+         * Check successful response
+         */
         if (data && data.status === 'success') {
             return data.data;
         }
 
-        throw new Error(
-            data?.message || 'Failed to create static virtual account'
-        );
+        throw new Error(data?.message || 'Failed to create static virtual account');
 
     } catch (err) {
         console.error('======================================');
         console.error('HEEDPAY ERROR');
         console.error('======================================');
-
         console.error('Error:', err.message);
-        console.error('Status:', err.response?.status);
-        console.error(
-            'Response Data:',
-            JSON.stringify(err.response?.data, null, 2)
-        );
 
-        throw new Error(
-            err.response?.data?.message || err.message
-        );
+        throw new Error(err.message);
     }
 }
 
+// ✅ FIXED EXPORT
 module.exports = {
     generateRefId,
     createVirtualAccount,
