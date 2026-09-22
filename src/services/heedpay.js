@@ -1,8 +1,9 @@
 const axios = require('axios');
 
 /**
- * Helper function to generate a valid refId
- * Rule: Must start with YYYYMMDD and be 12-30 characters
+ * Generate HeedPay refId
+ * Format:
+ * YYYYMMDD + 12 random characters
  */
 function generateRefId() {
     const now = new Date();
@@ -27,7 +28,7 @@ function generateRefId() {
 }
 
 /**
- * Provision Static Virtual Account
+ * Create HeedPay Static Virtual Account
  */
 async function createVirtualAccount({
     email,
@@ -40,72 +41,45 @@ async function createVirtualAccount({
     apiKey,
 }) {
     try {
+        console.log('========================================');
+        console.log('HEEDPAY CREATE VIRTUAL ACCOUNT');
+        console.log('========================================');
 
-        console.log('======================================');
-        console.log('HEEDPAY STATIC ACCOUNT REQUEST');
-        console.log('======================================');
+        // Clean API key
+        const cleanKey = apiKey
+            ? String(apiKey).trim()
+            : '';
 
+        // DEBUG - check whether token exists
         console.log(
-            'URL:',
-            'https://heedpay.com.ng/api/create-virtual-account'
+            'Access Token received:',
+            cleanKey ? 'YES' : 'NO'
         );
 
-        /**
-         * Clean API key
-         */
-        const cleanKey = apiKey ? String(apiKey).trim() : '';
+        console.log(
+            'Access Token length:',
+            cleanKey.length
+        );
 
-        /**
-         * ECHO ACCESS TOKEN
-         * This is what HeedPay asked you to check.
-         */
-        console.log('======================================');
-        console.log('HEEDPAY AUTH DEBUG');
-        console.log('======================================');
-
-        console.log('Access Token:', cleanKey);
-        console.log('Token Type:', typeof cleanKey);
-        console.log('Token Length:', cleanKey.length);
-
-        /**
-         * Format Authorization header
-         *
-         * Expected:
-         * Authorization: Token YOUR_API_KEY
-         */
-        const formattedToken = cleanKey.startsWith('Token ')
-            ? cleanKey
-            : `Token ${cleanKey}`;
-
-        console.log('Formatted Authorization:', formattedToken);
-
-        /**
-         * Stop if API key is missing
-         */
         if (!cleanKey) {
             throw new Error(
-                'HeedPay access token/API key is missing.'
+                'HEEDPAY_API_KEY is missing.'
             );
         }
 
-        /**
-         * Stop if business ID is missing
-         */
         if (!businessId) {
             throw new Error(
-                'HeedPay businessId is missing.'
+                'HEEDPAY_BUSINESS_ID is missing.'
             );
         }
 
         /**
-         * Generate reference ID
+         * Generate refId
          */
         const refId = generateRefId();
 
-        console.log('Generated refId:', refId);
-
         /**
-         * Request payload
+         * EXACT JSON STRUCTURE FROM HEEDPAY EXAMPLE
          */
         const payload = {
             refId: refId,
@@ -119,52 +93,95 @@ async function createVirtualAccount({
             businessId: businessId,
         };
 
+        console.log('Ref ID:', refId);
+
         console.log(
-            'Request Payload:',
+            'JSON BODY:',
             JSON.stringify(payload, null, 2)
         );
 
         /**
-         * Send request to HeedPay
+         * Authorization
+         *
+         * Based on your previous implementation,
+         * this sends:
+         *
+         * Authorization: Token YOUR_API_KEY
          */
-        const { data } = await axios.post(
+        const authorization = cleanKey.startsWith('Token ')
+            ? cleanKey
+            : `Token ${cleanKey}`;
+
+        console.log(
+            'Authorization header exists:',
+            authorization ? 'YES' : 'NO'
+        );
+
+        /**
+         * SEND REQUEST
+         */
+        const response = await axios.post(
             'https://heedpay.com.ng/api/create-virtual-account',
-            payload,
+
+            // Explicit JSON
+            JSON.stringify(payload),
+
             {
                 headers: {
-                    'Authorization': formattedToken,
+                    'Authorization': authorization,
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                 },
+
                 timeout: 30000,
+
+                // Make sure Axios doesn't transform it unexpectedly
+                transformRequest: [
+                    (data) => data
+                ],
             }
         );
 
-        /**
-         * Log response
-         */
-        console.log('======================================');
+        console.log('========================================');
         console.log('HEEDPAY RESPONSE');
-        console.log('======================================');
+        console.log('========================================');
 
         console.log(
-            'Response:',
-            JSON.stringify(data, null, 2)
+            'HTTP STATUS:',
+            response.status
         );
 
+        console.log(
+            'RESPONSE:',
+            JSON.stringify(response.data, null, 2)
+        );
+
+        const data = response.data;
+
         /**
-         * Check successful response
+         * SUCCESS
          */
-        if (data && data.status === 'success') {
+        if (data?.status === 'success') {
+
             console.log(
                 'Virtual account created successfully.'
+            );
+
+            console.log(
+                'Virtual Number:',
+                data.data?.virtualNumber
+            );
+
+            console.log(
+                'Bank Name:',
+                data.data?.bankName
             );
 
             return data.data;
         }
 
         /**
-         * HeedPay returned an unsuccessful response
+         * HEEDPAY RETURNED FAILURE
          */
         throw new Error(
             data?.message ||
@@ -173,28 +190,31 @@ async function createVirtualAccount({
 
     } catch (err) {
 
-        console.error('======================================');
+        console.error('========================================');
         console.error('HEEDPAY ERROR');
-        console.error('======================================');
+        console.error('========================================');
 
         console.error(
             'Error:',
             err.message
         );
 
-        console.error(
-            'Status:',
-            err.response?.status
-        );
+        if (err.response) {
 
-        console.error(
-            'Response Data:',
-            JSON.stringify(
-                err.response?.data,
-                null,
-                2
-            )
-        );
+            console.error(
+                'HTTP Status:',
+                err.response.status
+            );
+
+            console.error(
+                'Response:',
+                JSON.stringify(
+                    err.response.data,
+                    null,
+                    2
+                )
+            );
+        }
 
         throw new Error(
             err.response?.data?.message ||
@@ -203,9 +223,6 @@ async function createVirtualAccount({
     }
 }
 
-/**
- * Export functions
- */
 module.exports = {
     generateRefId,
     createVirtualAccount,
