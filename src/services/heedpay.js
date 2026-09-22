@@ -65,10 +65,15 @@ async function createVirtualAccount({
 
         /**
          * Format Authorization header
+         *
+         * HeedPay's docs specify the RAW key with NO "Token " prefix:
+         *   Authorization: heedpay9g4efbt45hg0d553f297b703fb510dd46e3e5cc
+         *
+         * Sending "Token <key>" fails HeedPay's auth check, which comes
+         * back as a misleading "must be in JSON Format" error instead of
+         * a proper 401 — that was the actual cause of every failure.
          */
-        const formattedToken = cleanKey.startsWith('Token ')
-            ? cleanKey
-            : `Token ${cleanKey}`;
+        const formattedToken = cleanKey;
 
         /**
          * Generate reference ID
