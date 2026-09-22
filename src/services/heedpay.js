@@ -1,3 +1,5 @@
+const axios = require('axios');
+
 /**
  * Helper function to generate a valid refId
  * Rule: Must start with YYYYMMDD and be 12-30 characters
@@ -43,7 +45,7 @@ async function createVirtualAccount({
         console.log('======================================');
 
         /**
-         * Clean API key and mandatory parameters
+         * Clean API key and parameters
          */
         const cleanKey = apiKey ? String(apiKey).trim() : '';
 
@@ -68,7 +70,8 @@ async function createVirtualAccount({
         const refId = generateRefId();
 
         /**
-         * Construct JSON object and stringify payload
+         * Construct JSON payload
+         * Explicitly fallback undefined values to empty strings to avoid invalid JSON output
          */
         const rawPayload = {
             refId: String(refId),
@@ -82,59 +85,60 @@ async function createVirtualAccount({
             businessId: String(businessId).trim(),
         };
 
-        const jsonBody = JSON.stringify(rawPayload);
+        const jsonStringData = JSON.stringify(rawPayload);
 
-        console.log('Sending JSON String:', jsonBody);
+        console.log('Sending JSON String:', jsonStringData);
 
         /**
-         * Send request to HeedPay using Native Fetch API
-         * This forces standard Content-Length headers without chunked transfer stream issues
+         * Send request to HeedPay using Axios
          */
-        const response = await fetch('https://heedpay.com.ng/api/create-virtual-account', {
-            method: 'POST',
+        const response = await axios({
+            method: 'post',
+            url: 'https://heedpay.com.ng/api/create-virtual-account',
+            data: jsonStringData,
             headers: {
                 'Authorization': formattedToken,
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'User-Agent': 'NodeJS/Fetch-Client',
             },
-            body: jsonBody,
+            timeout: 30000,
+            transformRequest: [(data) => data], // Prevents Axios from altering the raw JSON string
         });
 
-        const responseText = await response.text();
+        const data = response.data;
 
         console.log('======================================');
-        console.log('HEEDPAY RAW RESPONSE');
+        console.log('HEEDPAY RESPONSE');
         console.log('======================================');
-        console.log('Raw Body:', responseText);
+        console.log('Response:', JSON.stringify(data, null, 2));
 
-        let data;
-        try {
-            data = JSON.parse(responseText);
-        } catch (parseError) {
-            throw new Error(`Invalid non-JSON server response: ${responseText}`);
-        }
-
-        /**
-         * Check successful response
-         */
         if (data && data.status === 'success') {
             return data.data;
         }
 
-        throw new Error(data?.message || 'Failed to create static virtual account');
+        throw new Error(
+            data?.message || 'Failed to create static virtual account'
+        );
 
     } catch (err) {
         console.error('======================================');
         console.error('HEEDPAY ERROR');
         console.error('======================================');
-        console.error('Error:', err.message);
 
-        throw new Error(err.message);
+        console.error('Error:', err.message);
+        console.error('Status:', err.response?.status);
+        console.error(
+            'Response Data:',
+            JSON.stringify(err.response?.data, null, 2)
+        );
+
+        throw new Error(
+            err.response?.data?.message || err.message
+        );
     }
 }
 
-module.center = {
+module.exports = {
     generateRefId,
     createVirtualAccount,
 };
