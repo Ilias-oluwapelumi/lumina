@@ -130,7 +130,7 @@ router.get('/webhooks/heedpay', webhookCtrl.heedpayWebhook);
 |------------------------------------------------------------
 --------------
 */
-router.get('/webhooks/heedpay', webhookCtrl.heedpayWebhook);
+router.post('/webhooks/heedpay', webhookCtrl.heedpayWebhook);
 
 
 router.get(
