@@ -69,12 +69,13 @@ async function createVirtualAccount({
         /**
          * Format Authorization header
          *
-         * Expected:
-         * Authorization: Token YOUR_API_KEY
+         * HeedPay's docs show the raw key with NO "Token " prefix:
+         * Authorization: heedpay9g4efbt45hg0d553f297b703fb510dd46e3e5cc
+         *
+         * Sending "Token <key>" causes HeedPay's auth to fail, which it
+         * reports back as a misleading "must be in JSON Format" error.
          */
-        const formattedToken = cleanKey.startsWith('Token ')
-            ? cleanKey
-            : `Token ${cleanKey}`;
+        const formattedToken = cleanKey;
 
         console.log('Formatted Authorization:', formattedToken);
 
@@ -104,9 +105,16 @@ async function createVirtualAccount({
         console.log('Generated refId:', refId);
 
         /**
-         * Request payload object
+         * Request payload
+         *
+         * Pass a plain object — axios serializes this to JSON automatically
+         * when Content-Type is application/json. Manually calling
+         * JSON.stringify() first and then handing the resulting string to
+         * axios is unnecessary and not the cause of the JSON error (the
+         * real cause was the Authorization header), but a plain object is
+         * the more standard, less error-prone approach going forward.
          */
-        const payloadObject = {
+        const payload = {
             refId: refId,
             email: email,
             account_name: accountName,
@@ -118,15 +126,9 @@ async function createVirtualAccount({
             businessId: businessId,
         };
 
-        /**
-         * Explicitly serialize payload to JSON String
-         * This ensures the body is sent strictly as a JSON payload file stream.
-         */
-        const jsonPayload = JSON.stringify(payloadObject);
-
         console.log(
-            'Request Payload (JSON String):',
-            jsonPayload
+            'Request Payload:',
+            JSON.stringify(payload, null, 2)
         );
 
         /**
@@ -134,7 +136,7 @@ async function createVirtualAccount({
          */
         const { data } = await axios.post(
             'https://heedpay.com.ng/api/create-virtual-account',
-            jsonPayload,
+            payload,
             {
                 headers: {
                     'Authorization': formattedToken,
