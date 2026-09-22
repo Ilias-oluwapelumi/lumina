@@ -40,15 +40,9 @@ async function createVirtualAccount({
     apiKey,
 }) {
     try {
-
         console.log('======================================');
         console.log('HEEDPAY STATIC ACCOUNT REQUEST');
         console.log('======================================');
-
-        console.log(
-            'URL:',
-            'https://heedpay.com.ng/api/create-virtual-account'
-        );
 
         /**
          * Clean API key
@@ -56,65 +50,35 @@ async function createVirtualAccount({
         const cleanKey = apiKey ? String(apiKey).trim() : '';
 
         /**
-         * ECHO ACCESS TOKEN
-         */
-        console.log('======================================');
-        console.log('HEEDPAY AUTH DEBUG');
-        console.log('======================================');
-
-        console.log('Access Token:', cleanKey);
-        console.log('Token Type:', typeof cleanKey);
-        console.log('Token Length:', cleanKey.length);
-
-        /**
-         * Format Authorization header
-         *
-         * HeedPay's docs show the raw key with NO "Token " prefix:
-         * Authorization: heedpay9g4efbt45hg0d553f297b703fb510dd46e3e5cc
-         *
-         * Sending "Token <key>" causes HeedPay's auth to fail, which it
-         * reports back as a misleading "must be in JSON Format" error.
-         */
-        const formattedToken = cleanKey;
-
-        console.log('Formatted Authorization:', formattedToken);
-
-        /**
          * Stop if API key is missing
          */
         if (!cleanKey) {
-            throw new Error(
-                'HeedPay access token/API key is missing.'
-            );
+            throw new Error('HeedPay access token/API key is missing.');
         }
 
         /**
          * Stop if business ID is missing
          */
         if (!businessId) {
-            throw new Error(
-                'HeedPay businessId is missing.'
-            );
+            throw new Error('HeedPay businessId is missing.');
         }
+
+        /**
+         * Format Authorization header
+         */
+        const formattedToken = cleanKey.startsWith('Token ')
+            ? cleanKey
+            : `Token ${cleanKey}`;
 
         /**
          * Generate reference ID
          */
         const refId = generateRefId();
 
-        console.log('Generated refId:', refId);
-
         /**
-         * Request payload
-         *
-         * Pass a plain object — axios serializes this to JSON automatically
-         * when Content-Type is application/json. Manually calling
-         * JSON.stringify() first and then handing the resulting string to
-         * axios is unnecessary and not the cause of the JSON error (the
-         * real cause was the Authorization header), but a plain object is
-         * the more standard, less error-prone approach going forward.
+         * Request payload object
          */
-        const payload = {
+        const payloadObject = {
             refId: refId,
             email: email,
             account_name: accountName,
@@ -126,17 +90,15 @@ async function createVirtualAccount({
             businessId: businessId,
         };
 
-        console.log(
-            'Request Payload:',
-            JSON.stringify(payload, null, 2)
-        );
+        console.log('Request Payload:', payloadObject);
 
         /**
          * Send request to HeedPay
+         * Passing 'payloadObject' directly as an Object (NOT a JSON string)
          */
         const { data } = await axios.post(
             'https://heedpay.com.ng/api/create-virtual-account',
-            payload,
+            payloadObject,
             {
                 headers: {
                     'Authorization': formattedToken,
@@ -147,72 +109,38 @@ async function createVirtualAccount({
             }
         );
 
-        /**
-         * Log response
-         */
         console.log('======================================');
         console.log('HEEDPAY RESPONSE');
         console.log('======================================');
 
-        console.log(
-            'Response:',
-            JSON.stringify(data, null, 2)
-        );
+        console.log('Response:', JSON.stringify(data, null, 2));
 
-        /**
-         * Check successful response
-         */
         if (data && data.status === 'success') {
-            console.log(
-                'Virtual account created successfully.'
-            );
-
             return data.data;
         }
 
-        /**
-         * HeedPay returned an unsuccessful response
-         */
         throw new Error(
-            data?.message ||
-            'Failed to create static virtual account'
+            data?.message || 'Failed to create static virtual account'
         );
 
     } catch (err) {
-
         console.error('======================================');
         console.error('HEEDPAY ERROR');
         console.error('======================================');
 
-        console.error(
-            'Error:',
-            err.message
-        );
-
-        console.error(
-            'Status:',
-            err.response?.status
-        );
-
+        console.error('Error:', err.message);
+        console.error('Status:', err.response?.status);
         console.error(
             'Response Data:',
-            JSON.stringify(
-                err.response?.data,
-                null,
-                2
-            )
+            JSON.stringify(err.response?.data, null, 2)
         );
 
         throw new Error(
-            err.response?.data?.message ||
-            err.message
+            err.response?.data?.message || err.message
         );
     }
 }
 
-/**
- * Export functions
- */
 module.exports = {
     generateRefId,
     createVirtualAccount,
