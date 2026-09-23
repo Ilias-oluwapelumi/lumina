@@ -2,29 +2,21 @@ const db = require('../config/db');
 
 exports.heedpayWebhook = async (req, res) => {
   try {
-    const { eventType, status, data } = req.body;
+    const { amount_credited, reference } = req.body;
 
     console.log('=================================');
     console.log('HeedPay Webhook Received');
-    console.log('Event Type:', eventType);
-    console.log('Status:', status);
-    console.log('Data:', JSON.stringify(data));
+    console.log('Amount Credited:', amount_credited);
+    console.log('Reference:', reference);
+    console.log('Full Data:', JSON.stringify(req.body));
     console.log('=================================');
 
-    // Verify it's a successful virtual deposit
-    if (eventType !== 'VIRTUAL_DEPOSIT' || status !== 'success' || !data) {
-      console.log('⚠️ Invalid event type or status');
-      return res.json({ success: true });
-    }
-
-    const { amount_credited, reference } = data;
-    const transferAmount = parseFloat(amount_credited);
-
-    if (!transferAmount || !reference) {
+    if (!amount_credited || !reference) {
       console.log('⚠️ Missing amount_credited or reference');
       return res.json({ success: true });
     }
 
+    const transferAmount = parseFloat(amount_credited);
     if (transferAmount <= 0) {
       return res.json({ success: true });
     }
