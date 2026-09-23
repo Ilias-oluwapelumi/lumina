@@ -123,6 +123,7 @@ router.post(
 router.post('/wallet/fund/initialize', auth, walletCtrl.initializeFunding);
 router.get('/wallet/fund/account', auth, walletCtrl.getFundingAccount);
 router.get('/webhooks/heedpay', webhookCtrl.heedpayWebhook);
+router.post('/webhooks/heedpay', webhookCtrl.heedpayWebhook);
 /*
 |--------------------------------------------------------------------------
 | TRANSACTIONS
@@ -130,7 +131,7 @@ router.get('/webhooks/heedpay', webhookCtrl.heedpayWebhook);
 |------------------------------------------------------------
 --------------
 */
-router.post('/webhooks/heedpay', webhookCtrl.heedpayWebhook);
+
 
 
 router.get(
