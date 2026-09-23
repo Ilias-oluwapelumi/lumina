@@ -1,15 +1,16 @@
 const db = require('../config/db');
+const mongoose = require('mongoose');
+const User = () => mongoose.model('User'); // Helper matching your project architecture
 
 exports.heedpayWebhook = async (req, res) => {
   try {
-    // 1. Extract data and customer objects safely from req.body
     const eventType = req.body.eventType;
     const paymentData = req.body.data || {};
     const customerData = req.body.customer || {};
 
     const amount_credited = paymentData.amount_credited;
     const reference = paymentData.reference;
-    const accountNumber = customerData.account; // This is the virtual account number (e.g., "6616965650")
+    const accountNumber = customerData.account;
 
     console.log('=================================');
     console.log('HeedPay Webhook Received');
@@ -30,9 +31,8 @@ exports.heedpayWebhook = async (req, res) => {
       return res.json({ success: true });
     }
 
-    // 2. Find user by their virtual account number instead of transaction reference
-    // (Adjust 'virtualAccount.accountNumber' to match whatever field name you use in your User schema)
-    const user = await require('../config/db').User.findOne({
+    // Find user by virtual account number using your dynamic model function
+    const user = await User().findOne({
       'virtualAccount.accountNumber': accountNumber, 
     }).lean();
 
@@ -43,18 +43,18 @@ exports.heedpayWebhook = async (req, res) => {
 
     const userId = user.id || user._id;
 
-    // 3. Check if this specific transaction reference was already processed
+    // Check if already processed
     const existing = await db.getTransactionByReference(reference);
     if (existing && existing.status === 'successful') {
       console.log('✓ Transaction already processed');
       return res.json({ success: true });
     }
 
-    // 4. Credit wallet
+    // Credit wallet
     const wallet = await db.creditWallet(userId, transferAmount);
     console.log(`✅ Credited ₦${transferAmount} to user ${userId}`);
 
-    // 5. Create transaction record
+    // Create transaction record
     await db.createTransaction({
       userId,
       type: 'credit',
