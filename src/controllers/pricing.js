@@ -1,5 +1,5 @@
 module.exports = {
-  airtime: 50,
+  airtime:0,
   data: 100,
   cable: 100,
   electricity: 100,
