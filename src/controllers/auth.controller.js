@@ -2,6 +2,8 @@ const jwt = require('jsonwebtoken');
 const { sendServerError } = require('../utils/errors');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db');
+const { sendResetCode } = require('../services/email');
+const bcrypt = require('bcryptjs');
 
 const generateTokens = (userId) => {
   const accessToken = jwt.sign({ id: userId }, process.env.JWT_SECRET, {
@@ -155,4 +157,61 @@ exports.logout = async (req, res) => {
 exports.me = async (req, res) => {
   const wallet = await db.getWallet(req.user.id); // ← await added
   res.json({ success: true, data: { user: formatUser(req.user, wallet) } });
+};
+
+// POST /api/auth/reset-code
+exports.sendResetCodeHandler = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await db.findUserByEmail(email);
+
+    // Always return the same message so emails can't be fished for
+    if (!user) {
+      return res.json({ success: true, message: 'If that email exists, a code was sent' });
+    }
+
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await db.setResetCode(user.id, code, expiresAt);
+    await sendResetCode(email, code);
+
+    res.json({ success: true, message: 'Verification code sent to your email' });
+  } catch (err) {
+    console.error('reset-code error:', err);
+    res.status(500).json({ success: false, message: 'Could not send code. Try again.' });
+  }
+};
+
+// POST /api/auth/reset-password
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+
+    if (!email || !code || !newPassword || newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Invalid details' });
+    }
+
+    const user = await db.findUserByEmail(email);
+    if (!user || !user.resetCode || user.resetCode !== code) {
+      return res.status(400).json({ success: false, message: 'Invalid or wrong code' });
+    }
+    if (new Date() > new Date(user.resetCodeExpires)) {
+      return res.status(400).json({ success: false, message: 'Code expired. Request a new one.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await db.updateUser(user.id, {
+      passwordHash,
+      resetCode: null,
+      resetCodeExpires: null,
+      failedAttempts: 0,
+      lockedUntil: null,
+    });
+
+    res.json({ success: true, message: 'Password reset successfully' });
+  } catch (err) {
+    console.error('reset-password error:', err);
+    res.status(500).json({ success: false, message: 'Could not reset password' });
+  }
 };

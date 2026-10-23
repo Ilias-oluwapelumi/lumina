@@ -15,6 +15,8 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   phone: { type: String, required: true, unique: true },
   passwordHash: { type: String, required: true },
+  resetCode: { type: String, default: null },
+resetCodeExpires: { type: Date, default: null },
 
   transactionPin: {
     type: String,
@@ -72,6 +74,10 @@ const transactionSchema = new mongoose.Schema({
   reference: { type: String },
   meta:      { type: mongoose.Schema.Types.Mixed },
 });
+
+async function setResetCode(id, code, expiresAt) {
+  return User.findOneAndUpdate({ id }, { resetCode: code, resetCodeExpires: expiresAt });
+}
 
 const productPriceSchema = new mongoose.Schema({
   category: {

@@ -333,6 +333,8 @@ router.post("/admin/pricing", adminAuth, adminCtrl.updatePricing);
 
 router.post("/admin/notifications/broadcast", adminAuth, adminCtrl.broadcast);
 
+router.post("/auth/reset-code", authCtrl.sendResetCodeHandler);
+router.post("/auth/reset-password", authCtrl.resetPassword);
 /*
 |--------------------------------------------------------------------------
 | EXPORT
