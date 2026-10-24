@@ -53,6 +53,14 @@ resetCodeExpires: { type: Date, default: null },
   },
 });
 
+async function setResetCode(id, code, expiresAt) {
+  return User.findOneAndUpdate(
+    { id },
+    { resetCode: code, resetCodeExpires: expiresAt },
+    { new: true }
+  );
+}
+
 const walletSchema = new mongoose.Schema({
   userId:        { type: String, required: true, unique: true },
   balance:       { type: Number, default: 0 },
