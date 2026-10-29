@@ -53,13 +53,7 @@ resetCodeExpires: { type: Date, default: null },
   },
 });
 
-async function setResetCode(id, code, expiresAt) {
-  return User.findOneAndUpdate(
-    { id },
-    { resetCode: code, resetCodeExpires: expiresAt },
-    { new: true }
-  );
-}
+
 
 const walletSchema = new mongoose.Schema({
   userId:        { type: String, required: true, unique: true },
@@ -83,9 +77,7 @@ const transactionSchema = new mongoose.Schema({
   meta:      { type: mongoose.Schema.Types.Mixed },
 });
 
-async function setResetCode(id, code, expiresAt) {
-  return User.findOneAndUpdate({ id }, { resetCode: code, resetCodeExpires: expiresAt });
-}
+
 
 const productPriceSchema = new mongoose.Schema({
   category: {
@@ -262,6 +254,13 @@ const db = {
     if (!existingUser) throw new Error('User not found');
     await User.updateOne({ _id: existingUser._id }, { $set: fields });
     return await User.findOne({ _id: existingUser._id }).lean();
+  },
+  setResetCode: async (id, code, expiresAt) => {
+    const result = await User.updateOne(getFilter(id), {
+      $set: { resetCode: code, resetCodeExpires: expiresAt },
+    });
+    if (!result.matchedCount) throw new Error('User not found');
+    return result;
   },
 
   // PIN Operations (Polymorphic, safe, and consolidated)
@@ -639,6 +638,10 @@ updateProductPrice: async ({
 getVirtualAccount: async (id) => {
   const user = await User.findOne({ id }).lean();
   return user?.virtualAccount || null;
+
+  async function setResetCode(id, code, expiresAt) {
+  return User.findOneAndUpdate({ id }, { resetCode: code, resetCodeExpires: expiresAt });
+}
 },
 
   searchTransactions: async ({ query, status, category, page = 1, limit = 20 } = {}) => {
